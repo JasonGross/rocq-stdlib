@@ -3,6 +3,8 @@ ROCQMAKEFILE?=$(ROCQBIN)rocq makefile
 ROCQMAKEOPTIONS?=
 ROCQMAKEFILEOPTIONS?=
 
+.PHONY: all install
+
 all: Makefile.coq
 	+$(MAKE) -f $< $(ROCQMAKEOPTIONS)
 
