@@ -1,4 +1,4 @@
-DUNE=dev/with-rocq-wrap.sh dune
+DUNE=dune
 
 .PHONY: clean all install dune dune-install test-suite
 

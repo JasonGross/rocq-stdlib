@@ -16,8 +16,7 @@ rocqPackages.lib.overrideRocqDerivation {
   useDune = true;
 
   buildPhase = ''
-    patchShebangs dev/with-rocq-wrap.sh
-    dev/with-rocq-wrap.sh dune build --root . --no-buffer @refman-html ''${enableParallelBuilding:+-j $NIX_BUILD_CORES}
+    dune build --root . --no-buffer @refman-html ''${enableParallelBuilding:+-j $NIX_BUILD_CORES}
   '';
 
   installPhase = ''
