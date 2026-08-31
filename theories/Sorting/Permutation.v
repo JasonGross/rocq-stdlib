@@ -297,7 +297,7 @@ Proof.
     inversion_clear HF1; auto.
 Qed.
 
-#[global] Instance Permutation_filter (f : A -> bool) :
+#[export] Instance Permutation_filter (f : A -> bool) :
   Proper (@Permutation _ ==> @Permutation _) (filter f).
 Proof.
   intros l l' H.
