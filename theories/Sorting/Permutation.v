@@ -297,6 +297,17 @@ Proof.
     inversion_clear HF1; auto.
 Qed.
 
+#[export] Instance Permutation_filter (f : A -> bool) :
+  Proper (@Permutation _ ==> @Permutation _) (filter f).
+Proof.
+  intros l l' H.
+  induction H; simpl;
+    repeat match goal with
+      | |- context[if ?x then _ else _] => destruct x
+      end;
+    eauto.
+Qed.
+
 Lemma Permutation_Forall2 (P : A -> B -> Prop) :
  forall l1 l1' (l2 : list B), Permutation l1 l1' -> Forall2 P l1 l2 ->
  exists l2' : list B, Permutation l2 l2' /\ Forall2 P l1' l2'.
