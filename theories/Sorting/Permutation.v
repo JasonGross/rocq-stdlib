@@ -894,6 +894,11 @@ Qed.
 
 End Permutation_transp.
 
+Lemma fold_right_Permutation [A B] (f : A -> B -> B)
+  (H : forall x y z, f x (f y z) = f y (f x z)) xs ys :
+  Permutation xs ys -> forall o, fold_right f o xs = fold_right f o ys.
+Proof. induction 1; cbn [fold_right]; intuition try congruence. Qed.
+
 (* begin hide *)
 #[deprecated(since="Stdlib 9.1", use=Permutation_app_comm )]
 Abbreviation Permutation_app_swap := Permutation_app_comm (only parsing).

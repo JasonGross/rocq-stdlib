@@ -3819,6 +3819,16 @@ Section Repeat.
     - now rewrite repeat_length.
   Qed.
 
+  Lemma Forall_repeat (P : A -> Prop) x n : P x -> Forall P (repeat x n).
+  Proof. intros; induction n; cbn [repeat]; constructor; trivial. Qed.
+
+  Lemma repeat_inj (x y : A) n m :
+    repeat x n = repeat y m -> n = m /\ (x = y \/ n = 0).
+  Proof.
+    revert m; induction n as [|n IH]; intros [|m]; cbn [repeat]; try discriminate; auto.
+    intros [= -> ?%IH]; intuition auto.
+  Qed.
+
 End Repeat.
 Abbreviation repeat := repeat.
 

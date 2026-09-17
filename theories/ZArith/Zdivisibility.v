@@ -90,6 +90,30 @@ Qed.
 Lemma coprime_pow_l a b n : 0 <= n -> coprime a b -> coprime (a ^ n) b.
 Proof. symmetry. apply coprime_pow_r; try symmetry; trivial. Qed.
 
+Lemma coprime_mul_r_iff a b c : coprime a (b * c) <-> coprime a b /\ coprime a c.
+Proof.
+  split; [|intros []; auto using coprime_mul_r].
+  cbv [coprime]; intros H; split;
+    apply Z.divide_1_r_nonneg; auto using Z.gcd_nonneg; rewrite <-H;
+    apply Z.gcd_greatest; auto using Z.gcd_divide_l;
+    [apply Z.divide_mul_l|apply Z.divide_mul_r]; apply Z.gcd_divide_r.
+Qed.
+
+Lemma coprime_mul_l_iff a b c : coprime (a * b) c <-> coprime a c /\ coprime b c.
+Proof.
+  split; [|intros []; auto using coprime_mul_l].
+  intros H; symmetry in H; apply coprime_mul_r_iff in H; intuition symmetry; trivial.
+Qed.
+
+Lemma coprime_pow_r_iff a b n (Hn : 0 < n) : coprime a (b ^ n) <-> coprime a b.
+Proof.
+  rewrite <-(Z.succ_pred n), Z.pow_succ_r, coprime_mul_r_iff by lia.
+  split; [intros []; trivial|]; intros; split; trivial; apply coprime_pow_r; trivial; lia.
+Qed.
+
+Lemma coprime_pow_l_iff a b n (Hn : 0 < n) : coprime (a ^ n) b <-> coprime a b.
+Proof. split; intros; symmetry; apply (coprime_pow_r_iff _ _ _ Hn); symmetry; trivial. Qed.
+
 
 Definition prime p := 1 < p /\ forall n, 1 < n < p -> ~ (n|p).
 Existing Class prime.
@@ -170,6 +194,9 @@ Lemma divide_prime_prime_iff p q (Hp : prime p) (Hq : prime q) :
 Proof.
   split; intros; subst; auto using Z.divide_refl, divide_prime_prime.
 Qed.
+
+Lemma coprime_prime_prime p q (Hp : prime p) (Hq : prime q) (H : p <> q) : coprime p q.
+Proof. apply coprime_prime_l; trivial; intros ?%divide_prime_prime; auto. Qed.
 
 Theorem divide_prime_pp p q n (Hp : prime p) (Hq : prime q) (Hn : 0 <= n) :
   (p | q^n) -> p = q.

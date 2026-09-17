@@ -384,6 +384,7 @@ From Stdlib Require Export Classes.RelationPairs.
 From Stdlib Require Export Sets.Ensembles.
 From Stdlib Require Export Sets.Relations_1.
 From Stdlib Require Export Sorting.Sorted.
+From Stdlib Require Export ZArith.Factoring.
 From Stdlib Require Export Sorting.SetoidList.
 From Stdlib Require Export Structures.EqualitiesFacts.
 From Stdlib Require Export Structures.OrdersLists.
