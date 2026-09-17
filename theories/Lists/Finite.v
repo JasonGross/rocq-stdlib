@@ -86,6 +86,14 @@ Proof.
  rewrite in_map_iff. intros (y & E & Y). apply Ij in E; auto; congruence.
 Qed.
 
+Lemma NoDup_list_prod [A B] l l' : NoDup l -> NoDup l' -> NoDup (@list_prod A B l l').
+Proof.
+  intros H G; induction H; intros; cbn [list_prod]; [constructor|].
+  apply NoDup_app; trivial.
+  { eapply Injective_map_NoDup, G. inversion 1; trivial. }
+  intros [] (?&[-> ->]%pair_equal_spec&?)%in_map_iff []%in_prod_iff; tauto.
+Qed.
+
 Lemma Injective_list_carac A B (d:decidable_eq A)(f:A->B) :
   Injective f <-> (forall l, NoDup l -> NoDup (map f l)).
 Proof.

@@ -49,6 +49,9 @@ Definition coprime_Bezout a b := proj2 (Bezout_coprime_iff a b).
 #[global] Instance Symmetric_coprime : RelationClasses.Symmetric coprime.
 Proof. cbv [coprime]; intros ? ? ?; rewrite Z.gcd_comm; trivial. Qed.
 
+Lemma coprime_comm a b : coprime a b <-> coprime b a.
+Proof. cbv [coprime]; rewrite Z.gcd_comm; reflexivity. Qed.
+
 Lemma coprime_0_l_iff z : coprime 0 z <-> Z.abs z = 1.
 Proof. cbv [coprime]. rewrite Z.gcd_0_l. reflexivity. Qed.
 

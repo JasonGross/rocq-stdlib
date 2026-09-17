@@ -5,3 +5,4 @@ From Stdlib Require ZArith.Factoring.
 From Stdlib Require Zmod.Bits.
 From Stdlib Require Zmod.Zmod.
 From Stdlib Require Zmod.Zstar.
+From Stdlib Require Zmod.QuadraticReciprocity.

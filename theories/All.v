@@ -356,6 +356,7 @@ From Stdlib Require Export Zmod.ZmodInv.
 From Stdlib Require Export Zmod.ZmodNsatz.
 From Stdlib Require Export Zmod.Zmod.
 From Stdlib Require Export Zmod.Zstar.
+From Stdlib Require Export Zmod.QuadraticReciprocity.
 From Stdlib Require Export Zmod.Bits.
 From Stdlib Require Export ZArith.Zwf.
 From Stdlib Require Export ZArith.Zquot.

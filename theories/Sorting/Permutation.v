@@ -899,6 +899,12 @@ Lemma fold_right_Permutation [A B] (f : A -> B -> B)
   Permutation xs ys -> forall o, fold_right f o xs = fold_right f o ys.
 Proof. induction 1; cbn [fold_right]; intuition try congruence. Qed.
 
+Lemma Permutation_partition [A] f (l : list A) : Permutation l (fst (partition f l) ++ snd (partition f l)).
+Proof.
+  induction l; cbn [partition]; trivial.
+  case partition eqn:?, f; cbn [fst snd app]; eauto using Permutation_cons_app.
+Qed.
+
 (* begin hide *)
 #[deprecated(since="Stdlib 9.1", use=Permutation_app_comm )]
 Abbreviation Permutation_app_swap := Permutation_app_comm (only parsing).
