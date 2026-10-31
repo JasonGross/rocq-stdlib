@@ -5,3 +5,6 @@ From Stdlib Require Vectors.Vector.
 From Stdlib Require Vectors.Fin.
 From Stdlib Require Vectors.VectorSpec.
 From Stdlib Require Vectors.FinFun.
+From Stdlib Require Compat.Fin92.
+From Stdlib Require Compat.Vector92.
+From Stdlib Require Vectors.VectorFin.

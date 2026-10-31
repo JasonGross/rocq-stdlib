@@ -1,5 +1,22 @@
-From Stdlib Require Import PeanoNat List Lia.
-#[local] Set Warnings "-stdlib-vector".
+(************************************************************************)
+(*         *      The Rocq Prover / The Rocq Development Team           *)
+(*  v      *         Copyright INRIA, CNRS and contributors             *)
+(* <O___,, * (see version control and CREDITS file for authors & dates) *)
+(*   \VV/  **************************************************************)
+(*    //   *    This file is distributed under the terms of the         *)
+(*         *     GNU Lesser General Public License Version 2.1          *)
+(*         *     (see LICENSE file for the text of the license)         *)
+(************************************************************************)
+
+(** Length-indexed lists [vec A n], the new interface for [Vector.t].
+
+    This file is the replacement for [Vectors.VectorDef] and friends. The
+    module [Vector] now defines its interface as deprecated notations for
+    the definitions here when the two agree. Reasoning about [vec] goes
+    through [to_list] (which is injective, [to_list_inj]) and small
+    inversions ([inj_0], [inj_S]) instead of dependent elimination. *)
+
+From Stdlib Require Import PeanoNat List.
 From Stdlib.Compat Require Import Fin92.
 
 #[universes(template)]
@@ -8,7 +25,11 @@ Inductive vec A : nat -> Type :=
 | cons (h : A) (n : nat) (tl : vec _ n) : vec _ (S n).
 Arguments nil {_}.
 Arguments cons {_} _ {_} _.
-Notation t := vec (only parsing).
+(* Transitional: as long as the deprecated [Vectors.VectorDef] is loaded, it
+   resets the implicit arguments of [nil] and [cons] to the explicit form of
+   the old [Vector.t] constructors, [cons A h n v]. The notations of
+   [VectorNotations] work either way. *)
+Abbreviation t := vec (only parsing).
 
 Section UniformElementType.
 Context {A : Type}.
@@ -79,17 +100,6 @@ Fixpoint firstn {n} (v : vec A n) {struct v} : forall i, vec A (Nat.min n i) :=
       end
   end.
 
-Succeed
-Fixpoint skipn (i : nat) {n} (v : vec A n) {struct i} : vec A (Nat.sub n i) :=
-  match i with
-  | O => cast v (eq_sym (Nat.sub_0_r n))
-  | S i =>
-      match v with
-      | nil => nil
-      | cons a v => skipn i v
-      end
-  end.
-
 Fixpoint skipn {n} (v : vec A n) i {struct v} : vec A (Nat.sub n i) :=
   match v with
   | nil => match i with (O|_) => nil end
@@ -98,17 +108,6 @@ Fixpoint skipn {n} (v : vec A n) i {struct v} : vec A (Nat.sub n i) :=
       | O => v
       | S i => skipn v' i
       end
-  end.
-
-Succeed
-Fixpoint get {n : nat} (v : vec A n) (i : nat) {struct v} :=
-  match v with
-  | nil => None
-  | cons a v =>
-    match i with
-    | O => Some a
-    | S i => get v i
-    end
   end.
 
 Definition get {n} (v : vec A n) i := hd_error (skipn v i).
@@ -123,24 +122,15 @@ Fixpoint put {n : nat} (v : vec A n) (i : nat) (a : A) {struct v} :=
     end
   end.
 
-Section WithI.
-Context (i : nat).
-Definition lastn {n} (v : vec A n) : vec A (Nat.min n i).
-(*
-refine
-  match Nat.eq_dec n (Nat.min n i) with
-  | left Heq => eq_rect _ _ v _ Heq
-  | right Hneq =>
-    match v in vec _ n return _ -> vec _ (Nat.min n _) with
-    | nil => fun _ => nil
-    | @cons _ a n' v => fun _ => cast (@lastn _ v) _
-    end Hneq
-  end.
- *)
-refine (cast (skipn v (n-i)) _).
-abstract lia.
-Defined.
-End WithI.
+Lemma lastn_subproof n i : n - (n - i) = Nat.min n i.
+Proof.
+  destruct (Nat.le_ge_cases n i) as [H|H].
+  { rewrite Nat.min_l, (proj2 (Nat.sub_0_le _ _) H), Nat.sub_0_r; trivial. }
+  { rewrite Nat.min_r, Nat.sub_sub_distr, Nat.sub_diag; trivial. }
+Qed.
+
+Definition lastn {n} (v : vec A n) i : vec A (Nat.min n i) :=
+  cast (skipn v (n-i)) (lastn_subproof n i).
 
 Fixpoint unappl {i n} {struct i} : forall (v : vec A (i+n)), vec A i :=
   match i with
@@ -166,14 +156,16 @@ Lemma length_to_list n (v : t A n) : length (to_list v) = n.
 Proof. induction v; cbn [length to_list]; auto. Qed.
 
 Local Definition rev_append {n p} (v : vec A n) (w : vec A p) : vec A (n + p).
-  refine (cast (of_list (List.rev_append (to_list v) (to_list w))) _).
 Proof.
+  refine (cast (of_list (List.rev_append (to_list v) (to_list w))) _).
   abstract (rewrite rev_append_rev, length_app, length_rev, 2 length_to_list; trivial).
 Defined.
 
 Definition rev {n} (v : vec A n) : vec A n.
+Proof.
   refine (cast (of_list (List.rev (to_list v))) _).
-Proof. abstract (rewrite length_rev, length_to_list; trivial). Defined.
+  abstract (rewrite length_rev, length_to_list; trivial).
+Defined.
 End UniformElementType.
 Coercion to_list : t >-> list.
 Arguments length_to_list [A] n v.
@@ -221,48 +213,38 @@ Delimit Scope vector_scope with vector.
 Notation "[ ]" := nil (format "[ ]") : vector_scope.
 Notation "h :: t" := (cons h t) (at level 60, right associativity)
   : vector_scope.
-Notation "[ x ]" := (x :: nil) : vector_scope.
+Notation "[ x ]" := (cons x nil) : vector_scope.
 Notation "[ x ; y ; .. ; z ]" := (cons x (cons y .. (cons z nil) ..)) : vector_scope.
 Infix "++" := app : vector_scope.
 Open Scope vector_scope.
 End VectorNotations.
 
 
-Section Forall.
-Context {A} (P: A -> Prop).
-Inductive Forall : forall {n} (v : vec A n), Prop :=
-| Forall_nil : Forall nil
-| Forall_cons {n} x (v : vec A n) (_ : P x) (_ : Forall v) : Forall (cons x v).
-End Forall.
+(** The predicates are declared outside of sections so that their induction
+principles take the element types as explicit arguments, as [Vector] did. *)
 
-Section Exists.
-Context {A} (P: A -> Prop).
-Inductive Exists : forall {n}, vec A n -> Prop :=
-| Exists_cons_hd {n} x v (_ : P x) : @Exists (S n) (cons x v)
-| Exists_cons_tl {n} x v (_ : Exists v) : @Exists (S n) (cons x v).
-End Exists.
+Inductive Forall {A} (P : A -> Prop) : forall {n}, vec A n -> Prop :=
+| Forall_nil : Forall P nil
+| Forall_cons {n} x (v : vec A n) (_ : P x) (_ : Forall P v) : Forall P (cons x v).
 
-Section In.
-Context {A} (a : A).
-Inductive In : forall {n}, vec A n -> Prop :=
-| In_cons_hd {n} v : @In (S n) (cons a v)
-| In_cons_tl {n} x v (_ : In v) : @In (S n) (cons x v).
-End In.
+Inductive Exists {A} (P : A -> Prop) : forall {n}, vec A n -> Prop :=
+| Exists_cons_hd {n} x (v : vec A n) (_ : P x) : Exists P (cons x v)
+| Exists_cons_tl {n} x (v : vec A n) (_ : Exists P v) : Exists P (cons x v).
 
-Section Forall2.
-Context {A B} (P:A->B->Prop).
-Inductive Forall2 : forall {n}, vec A n -> vec B n -> Prop :=
-| Forall2_nil : @Forall2 0 nil nil
-| Forall2_cons {n} x1 x2 v1 v2 (_ : P x1 x2) (_ : Forall2 v1 v2)
-  : @Forall2 (S n) (cons x1 v1) (cons x2 v2).
-End Forall2.
+Inductive In {A} (a : A) : forall {n}, vec A n -> Prop :=
+| In_cons_hd {n} (v : vec A n) : In a (cons a v)
+| In_cons_tl {n} x (v : vec A n) (_ : In a v) : In a (cons x v).
 
-Section Exists2.
-Context {A B} (P : A->B->Prop).
-Inductive Exists2 : forall {n}, vec A n -> vec B n -> Prop :=
-| Exists2_cons_hd {n} x1 x2 v1 v2 (_ :  P x1 x2) : @Exists2 (S n) (x1::v1) (x2::v2)
-| Exists2_cons_tl {n} x1 x2 v1 v2 (_ : Exists2 v1 v2) : @Exists2 (S n) (x1::v1) (x2::v2).
-End Exists2.
+Inductive Forall2 {A B} (P : A -> B -> Prop) : forall {n}, vec A n -> vec B n -> Prop :=
+| Forall2_nil : Forall2 P nil nil
+| Forall2_cons {n} x1 x2 (v1 : vec A n) (v2 : vec B n) (_ : P x1 x2) (_ : Forall2 P v1 v2)
+  : Forall2 P (cons x1 v1) (cons x2 v2).
+
+Inductive Exists2 {A B} (P : A -> B -> Prop) : forall {n}, vec A n -> vec B n -> Prop :=
+| Exists2_cons_hd {n} x1 x2 (v1 : vec A n) (v2 : vec B n) (_ : P x1 x2)
+  : Exists2 P (cons x1 v1) (cons x2 v2)
+| Exists2_cons_tl {n} x1 x2 (v1 : vec A n) (v2 : vec B n) (_ : Exists2 P v1 v2)
+  : Exists2 P (cons x1 v1) (cons x2 v2).
 
 
 Lemma inj_0 [A] (v : vec A 0) : v = nil.
@@ -405,6 +387,9 @@ Proof. apply to_list_inj; rewrite to_list_map, 2 to_list_rev, List.map_rev, to_l
 
 (** * [map] *)
 
+Lemma map_id [A n] (v : vec A n) : map (fun x => x) v = v.
+Proof. apply to_list_inj; rewrite to_list_map, List.map_id; trivial. Qed.
+
 Lemma map_nil [A B] (f : A -> B) : map f nil = nil.
 Proof. trivial. Qed.
 
@@ -465,7 +450,11 @@ Proof. apply to_list_inj; repeat rewrite ?to_list_cast; trivial. Qed.
 (** * [put] *)
 
 Lemma put_alt_subproof : forall x x0 : nat, Nat.min x x0 + (x - x0) = x.
-Proof. lia. Qed.
+Proof.
+  intros n i; destruct (Nat.le_ge_cases n i) as [H|H].
+  { rewrite Nat.min_l, (proj2 (Nat.sub_0_le _ _) H), Nat.add_0_r; trivial. }
+  { rewrite Nat.min_r, Nat.add_comm; auto using Nat.sub_add. }
+Qed.
 
 Lemma put_alt [A n] (v : vec A n) (i : nat) (a : A) :
   put v i a = cast (app (firstn v i) (match skipn v i with nil => nil | cons _ v => cons a v end)) (put_alt_subproof n i).

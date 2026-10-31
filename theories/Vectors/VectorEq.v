@@ -67,5 +67,5 @@ Section BEQ.
 
 End BEQ.
 
-#[deprecated(since="9.1", use=Vector92.cast)]
-Notation cast := Vector92.cast (only parsing).
+#[deprecated(since="9.3", use=Vector92.cast)]
+Abbreviation cast := Vector92.cast (only parsing).
