@@ -8,7 +8,7 @@ Fixpoint getFin {n : nat} (v : vec A n) {struct v} : fin n -> A :=
   match v with
   | nil => fun i => False_rect _ (inj_0 i)
   | cons a v => fun i =>
-    match i in fin n return vec _ (pred n) -> A with
+    match i in Fin92.t n return vec _ (pred n) -> A with
     | finO => fun _ => a
     | finS i => fun v => getFin v i
     end v
@@ -18,7 +18,7 @@ Fixpoint putFin {n} (v : vec A n) {struct v} : fin n -> A -> vec A n :=
   match v with
   | nil => fun _ _ => nil
   | cons b v => fun i =>
-    match i in fin n return vec _ (pred n) -> _ -> vec _ n with
+    match i in Fin92.t n return vec _ (pred n) -> _ -> vec _ n with
     | finO => fun v a => cons a v
     | finS i => fun v a => cons b (putFin v i a)
     end v
