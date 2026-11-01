@@ -33,8 +33,11 @@ Check eq_refl : equal String.eqb m1 m1 = true.
 Check eq_refl : equal String.eqb m1 (remove 5 m1) = false.
 Check eq_refl : mem 5 m1 = true.
 Check eq_refl : find 7 m1 = None.
-(* [to_list] is in preorder, [elements] in the order of [PositiveOrderedTypeBits]. *)
-Check eq_refl : Trie.to_list m1 = [(1, "one"); (3, "three"); (5, "five")].
+(* [to_list], [keys] and [values] follow the order of [elements]. *)
+Check eq_refl : Trie.to_list m1 = [(1, "one"); (5, "five"); (3, "three")].
+Check eq_refl : Trie.keys m1 = [1; 5; 3].
+Check eq_refl : Trie.values m1 = ["one"; "five"; "three"].
+Check eq_refl : elements m1 = Trie.to_list m1.
 
 (* Extensionality: equal maps are Leibniz-equal, so these hold by computation. *)
 Check eq_refl : remove 1 (add 1 "x" (empty string)) = empty string.
