@@ -563,6 +563,7 @@ From Stdlib Require Export FSets.FMapList.
 From Stdlib Require Export FSets.FMaps.
 From Stdlib Require Export FSets.FMapAVL.
 From Stdlib Require Export FSets.FMapFullAVL.
+From Stdlib Require Export EMaps.Trie.
 From Stdlib Require Export Compat.Stdlib818.
 From Stdlib Require Export Compat.Coq820.
 From Stdlib Require Export Compat.Coq819.

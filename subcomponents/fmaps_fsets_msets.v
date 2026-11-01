@@ -16,6 +16,7 @@ From Stdlib Require FSets.FMapFullAVL.
 From Stdlib Require FSets.FSetToFiniteSet.
 From Stdlib Require FSets.FMapAVL.
 From Stdlib Require FSets.FMapPositive.
+From Stdlib Require EMaps.Trie.
 From Stdlib Require FSets.FSets.
 From Stdlib Require FSets.FMaps.
 From Stdlib Require FSets.FSetFacts.
