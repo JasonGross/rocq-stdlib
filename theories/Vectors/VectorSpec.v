@@ -8,10 +8,6 @@
 (*         *     (see LICENSE file for the text of the license)         *)
 (************************************************************************)
 
-(** N.B.: Using this encoding of vectors is discouraged.
-See <https://github.com/coq/stdlib/blob/master/theories/Vectors/Vector.v>. *)
-Attributes warn(cats="stdlib vector", note="Using Vector.t is known to be technically difficult, see <https://github.com/rocq-prover/stdlib/blob/master/theories/Vectors/Vector.v>.").
-
 (** Proofs of specification for functions defined over Vector
 
    Initial Author: Pierre Boutillier
@@ -20,8 +16,294 @@ Attributes warn(cats="stdlib vector", note="Using Vector.t is known to be techni
 
 #[local] Set Warnings "-stdlib-vector,-deprecated".
 From Stdlib Require Fin List.
-From Stdlib Require Import Vector92 VectorFin VectorDef PeanoNat Eqdep_dec.
+From Stdlib Require Import VectorDef PeanoNat Eqdep_dec.
 Import VectorNotations EqNotations.
+
+(** * Properties of the new interface *)
+
+(** [to_list] is injective: most proofs about [vec] go through it. *)
+
+Lemma to_list_inj [A n] (v w : vec A n) : to_list v = to_list w -> v = w.
+Proof.
+  induction n; cbn [to_list].
+  { rewrite (inj_0 v), (inj_0 w); trivial. }
+  { rewrite (inj_S v), (inj_S w); inversion 1; f_equal; eauto. }
+Qed.
+
+
+Lemma to_list_inj_iff [A n] (v w : vec A n) : to_list v = to_list w <-> v = w.
+Proof. split; try apply to_list_inj; congruence. Qed.
+
+Lemma to_list_inj_dep [A m] (v : vec A m) [n] (w : vec A n) :
+  to_list v = to_list w -> existT _ _ v = existT _ _ w.
+Proof.
+  intros H; specialize (f_equal (@length _) H); rewrite 2 length_to_list.
+  destruct 1; auto using f_equal, to_list_inj.
+Qed.
+
+Lemma to_list_eq_rect [A m n] (p : m = n) v : to_list (eq_rect m (vec A) v n p) = to_list v.
+Proof. case p; trivial. Qed.
+
+Lemma to_list_cast [A m n] (p : m = n) (v : vec A m) : to_list (cast v p) = to_list v.
+Proof. cbv[cast]. case Nat.eq_dec; intros; [apply to_list_eq_rect|contradiction]. Qed.
+
+
+Lemma to_list_nil A : to_list (@nil A) = List.nil.
+Proof. trivial. Qed.
+
+Lemma to_list_cons [A n] a (v : vec A n) : to_list ((a :: v)) = List.cons a v.
+Proof. trivial. Qed.
+
+Lemma to_list_of_list [A] (l : list A) : to_list (of_list l) = l.
+Proof. induction l; cbn [to_list of_list]; congruence. Qed.
+
+Lemma hd_to_list [A n] (d : A) (v : vec A (S n)) : List.hd d v = hd v.
+Proof. rewrite (inj_S v); trivial. Qed.
+
+Lemma to_list_tl [A n] (v : vec A (S n)) : to_list (tl v) = List.tl v.
+Proof. rewrite (inj_S v); trivial. Qed.
+
+Lemma last_to_list [A n] (d : A) (v : vec A (S n)) : List.last v d = last v.
+Proof.
+  rewrite (inj_S v) in *.
+  generalize (hd v); generalize (tl v); clear v; intros v; induction v; trivial.
+  set (h::v) as hv; cbn [List.last to_list last]; subst hv. rewrite IHv. auto.
+Qed.
+
+Lemma to_list_repeat [A n] (a : A) : to_list (repeat a n) = List.repeat a n.
+Proof. induction n; cbn [to_list repeat List.repeat]; auto using f_equal2. Qed.
+
+Lemma to_list_app [A n p] (v : vec A n) (w : vec A p) : to_list (app v w) = List.app v w.
+Proof. induction v; cbn [to_list app List.app]; rewrite ?IHv; trivial. Qed.
+
+Lemma to_list_firstn [A n] (v : vec A n) i : to_list (firstn v i) = List.firstn i v.
+Proof. revert i; induction v, i; cbn [to_list firstn List.firstn]; congruence. Qed.
+
+
+Lemma to_list_rev [A n] (v : vec A n) : to_list (rev v) = List.rev v.
+Proof. cbv [rev]. rewrite to_list_cast, to_list_of_list; trivial. Qed.
+
+Lemma to_list_In A a n (v : vec A n): In a v <-> List.In a (to_list v).
+Proof.
+  split.
+  { induction 1; [left|right]; auto. }
+  { induction v; inversion 1; subst; auto using In_cons_tl, In_cons_hd. }
+Qed.
+
+Lemma to_list_map [A B n] (f : A -> B) (v : vec A n) : to_list (map f v) = List.map f v.
+Proof. induction v; cbn [to_list map List.map]; auto using f_equal. Qed.
+
+Lemma to_list_map2 [A B C n] (f : A -> B -> C) (v : vec A n) (w : vec B n) :
+  to_list (map2 f v w) = List.map (uncurry f) (List.combine v w).
+Proof.
+  induction v; [|rewrite (inj_S w)];
+    cbn [to_list map2 List.map List.combine]; auto using f_equal.
+Qed.
+
+Lemma to_list_snoc [A n] (v : vec A n) a : to_list (snoc v a) = List.app v (List.cons a List.nil).
+Proof. induction v; cbn; auto using f_equal. Qed.
+
+
+(** * [app] *)
+
+Lemma app_assoc_dep [A n m l] (a : vec A n) (b : vec A m) (c : vec A l) :
+  existT _ _ (app a (app b c)) = existT _ _ (app (app a b) c).
+Proof.
+  apply to_list_inj_dep.
+  induction a; cbn [app to_list]; auto using f_equal2.
+Qed.
+
+Lemma app_assoc_vec [A n m l] (a : vec A n) (b : vec A m) (c : vec A l) :
+  app a (app b c) = cast (app (app a b) c) (eq_sym (Nat.add_assoc _ _ _)).
+Proof.
+  pose proof app_assoc_dep a b c as E; symmetry in E; inversion_sigma.
+  apply to_list_inj; rewrite <-E2, to_list_eq_rect, to_list_cast; trivial.
+Qed.
+
+Lemma sym_app_assoc [A n m l] (a : vec A n) (b : vec A m) (c : vec A l) :
+  app (app a b) c = cast (app a (app b c)) (Nat.add_assoc _ _ _).
+Proof.
+  pose proof app_assoc_dep a b c as E; inversion_sigma.
+  apply to_list_inj; rewrite <-E2, to_list_eq_rect, to_list_cast; trivial.
+Qed.
+
+Lemma app_repeat_repeat [A] (a : A) n m : app (repeat a n) (repeat a m) = repeat a (n + m).
+Proof. induction n; cbn [app repeat Nat.add]; auto using f_equal. Qed.
+
+(** * [rev] *)
+
+Lemma rev_nil A : rev [] = [] :> vec A _.
+Proof. trivial. Qed.
+
+Lemma rev_cons_snoc [A n] a (v : vec A n) : rev ((a :: v)) = snoc (rev v) a.
+Proof. erewrite <-to_list_inj_iff, to_list_snoc, 2 to_list_rev, to_list_cons, List.rev_cons; trivial. Qed.
+
+Lemma rev_snoc [A n] (v : vec A n) a : rev (snoc v a) = (a :: (rev v)).
+Proof. erewrite <-to_list_inj_iff, to_list_cons, 2 to_list_rev, to_list_snoc, List.rev_unit; trivial. Qed.
+
+Lemma rev_rev [A n] (v : vec A n) : rev (rev v) = v.
+Proof. apply to_list_inj; rewrite 2 to_list_rev, List.rev_involutive; trivial. Qed.
+
+Lemma rev_map [A B] (f : A -> B) [n] (v : vec A n) : rev (map f v) = map f (rev v).
+Proof. apply to_list_inj; rewrite to_list_map, 2 to_list_rev, List.map_rev, to_list_map. trivial. Qed.
+
+Lemma map_rev [A B] (f : A -> B) [n] (v : vec A n) : map f (rev v) = rev (map f v).
+Proof. apply to_list_inj; rewrite to_list_map, 2 to_list_rev, List.map_rev, to_list_map. trivial. Qed.
+
+
+(** * [map] *)
+
+Lemma map_id [A n] (v : vec A n) : map (fun x => x) v = v.
+Proof. apply to_list_inj; rewrite to_list_map, List.map_id; trivial. Qed.
+
+Lemma map_nil [A B] (f : A -> B) : map f [] = [].
+Proof. trivial. Qed.
+
+Lemma map_cons_vec [A B] (f : A -> B) (a : A) [n] (v : vec A n) :
+  map f ((a :: v)) = ((f a) :: (map f v)).
+Proof. trivial. Qed.
+
+Lemma map_map [A B C] (f : A -> B) (g : B -> C) [n] (v : vec A n) :
+  map g (map f v) = map (fun x => g (f x)) v.
+Proof. apply to_list_inj; rewrite 3 to_list_map, List.map_map; trivial. Qed.
+
+Lemma map_ext_in [A B] (f g:A->B) [n] (v : vec A n)
+  (H : forall a, In a v -> f a = g a) : map f v = map g v.
+Proof.  setoid_rewrite to_list_In in H; erewrite <-to_list_inj_iff, !to_list_map, List.map_ext_in; trivial. Qed.
+
+Lemma map_ext [A B] (f g:A->B) [n] (v : vec A n)
+  (H : forall a, f a = g a) : map f v = map g v.
+Proof. erewrite <-to_list_inj_iff, !to_list_map, List.map_ext; trivial. Qed.
+
+Lemma map_app_vec [A B] (f : A -> B) [n m] (v: vec A n) (w: vec A m) :
+  map f (v ++ w) = map f v ++ map f w.
+Proof. erewrite <-to_list_inj_iff, to_list_app, 3 to_list_map, to_list_app, List.map_app; trivial. Qed.
+
+Lemma map_snoc [A B] (f : A -> B) [n] (v : vec A n) a :
+  map f (snoc v a) = snoc (map f v) (f a).
+Proof. induction v; cbn [map snoc]; auto using f_equal. Qed.
+
+
+(** * [fold_right] *)
+
+Lemma fold_right_snoc [A B] f (a : A) (b : B) n (v : vec A n) :
+  fold_right f (snoc v a) b = fold_right f v (f a b).
+Proof. induction v; cbn [snoc fold_right]; rewrite ?IHv; trivial. Qed.
+
+Lemma fold_right_rev [A B] (f : A -> B -> B) [n] (v : vec A n) b :
+  fold_right f (rev v) b = fold_left (fun x y => f y x) b v.
+Proof.
+  revert b; induction v; intros; rewrite ?rev_nil, ?rev_cons_snoc, ?fold_right_snoc; trivial.
+Qed.
+
+
+(** * [cast] *)
+
+Lemma cast_nil [A] p : cast [] p = [] :> vec A 0.
+Proof. trivial. Qed.
+
+Lemma cast_cons [A m] a (v : vec A m) [n] p :
+  cast ((a :: v)) p = (a :: (cast v (Nat.succ_inj _ _ p))) :> vec A (S n).
+Proof. apply to_list_inj; repeat rewrite ?to_list_cast, ?to_list_cons; trivial. Qed.
+
+Lemma cast_refl [A n] (v : vec A n) p : cast v p = v.
+Proof. apply to_list_inj; repeat rewrite ?to_list_cast; trivial. Qed.
+
+Lemma cast_ext [A m] (v : vec A m) [n] p q : cast v p = cast v q :> vec A n.
+Proof. apply to_list_inj; repeat rewrite ?to_list_cast; trivial. Qed.
+
+
+(** * [put] *)
+
+Lemma put_alt_subproof : forall x x0 : nat, Nat.min x x0 + (x - x0) = x.
+Proof.
+  intros n i; destruct (Nat.le_ge_cases n i) as [H|H].
+  { rewrite Nat.min_l, (proj2 (Nat.sub_0_le _ _) H), Nat.add_0_r; trivial. }
+  { rewrite Nat.min_r, Nat.add_comm; auto using Nat.sub_add. }
+Qed.
+
+Lemma put_alt [A n] (v : vec A n) (i : nat) (a : A) :
+  put v i a = cast (app (firstn v i) (match skipn v i with [] => [] | (_ :: v) => (a :: v) end)) (put_alt_subproof n i).
+Proof.
+  revert i; induction v, i; cbn [put firstn app skipn Nat.min Nat.sub Nat.add];
+    rewrite ?cast_refl, ?cast_cons, ?IHv; auto using f_equal, cast_ext.
+Qed.
+
+Lemma nth_error_to_list [A n] (v : vec A n) i : List.nth_error v (Fin.val i) = Some (getFin v i).
+Proof. induction v; [case Fin.inj_0 | case (Fin.inj_S i) as [->|[? ->] ] ]; cbn; eauto. Qed.
+
+Lemma getFin_inj [A n] (v w : vec A n)
+  (H : forall i, getFin v i = getFin w i) : v = w.
+Proof.
+  apply to_list_inj, List.nth_error_ext; intros i.
+  case (Nat.ltb_spec i n) as [Hi|].
+  { rewrite <-(Fin.val_mk i n Hi), !nth_error_to_list; auto using f_equal. }
+  { rewrite 2 (proj2 (List.nth_error_None _ _)); rewrite ?length_to_list; auto. }
+Qed.
+
+Lemma getFin_inj_iff [A n] (v w : vec A n) :
+  (forall i, getFin v i = getFin w i) <-> v = w.
+Proof. split; [apply getFin_inj | intros ->; auto]. Qed.
+
+(** ** The deprecated operations in terms of the new ones *)
+
+#[deprecated(since="9.3", use=getFin)]
+Lemma nth_getFin A n v i : @nth A n v i = @getFin A n v i.
+Proof. induction i; trivial; try rewrite (inj_S v); cbn; trivial. Qed.
+
+#[deprecated(since="9.3", use=getLt)]
+Lemma nth_order_getLt [A n] v p H : @nth_order A n v p H = @getLt A n v p H.
+Proof. cbv [nth_order getLt]. rewrite nth_getFin, Fin.of_nat_lt_mk; trivial. Qed.
+
+#[deprecated(since="9.3", use=putFin)]
+Lemma replace_putFin A n v i x : @replace A n v i x = @putFin A n v i x.
+Proof. induction i; trivial; try rewrite (inj_S v); cbn; congruence. Qed.
+
+#[deprecated(since="9.3", use=putLt)]
+Lemma replace_order_putLt [A n] v p H x : @replace_order A n v p H x = @putLt A n v p H x.
+Proof. cbv [replace_order putLt]. rewrite replace_putFin, Fin.of_nat_lt_mk; trivial. Qed.
+
+#[deprecated(since="9.3", use=snoc)]
+Lemma shiftin_snoc [A n] x v : @shiftin A n x v = @snoc A n v x.
+Proof. induction v; cbn; congruence. Qed.
+
+#[deprecated(since="9.3", use=firstn)]
+Lemma take_firstn_dep [A n] p le v : existT _ _ (@take A n p le v) = existT _ _ (@firstn A n v p).
+Proof.
+  revert dependent p; induction v, p; cbn [Nat.min take firstn]; auto;
+    [pose proof Nat.nle_succ_0 p; contradiction|intros].
+  specialize (IHv _ (le_S_n p n le)); symmetry in IHv; inversion_sigma.
+  rewrite <-IHv2; clear IHv2.
+  apply to_list_inj_dep.
+  rewrite 2 to_list_cons, to_list_eq_rect; trivial.
+Qed.
+
+#[deprecated(since="9.3", use=firstn)]
+Lemma take_firstn [A n] p le v : @take A n p le v = cast (@firstn A n v p) (Nat.min_r _ _ le).
+Proof.
+  pose proof eq_sym (take_firstn_dep p le v) as Hr; inversion_sigma.
+  rewrite <-Hr2; clear Hr2.
+  apply to_list_inj; rewrite to_list_eq_rect, to_list_cast; trivial.
+Qed.
+
+#[deprecated(since="9.3", use=unapp)]
+Lemma splitat_unapp {A} l r v : @splitat A l r v = @unapp A l r v.
+Proof. induction l; cbn; rewrite <-?IHl; trivial. Qed.
+
+#[deprecated(since="9.3", use=rev_append)]
+Lemma rev_append_tail_rev_append [A n p] v w : existT _ _ (@rev_append_tail A n p v w) = existT _ _ (@rev_append A n p v w).
+Proof.
+  revert dependent p; induction v; intros.
+  { cbv [rev_append];
+    apply to_list_inj_dep;
+    rewrite ?to_list_cast, ?to_list_of_list; cbn; rewrite ?IHv; trivial. }
+  { cbn; rewrite IHv.
+    apply to_list_inj_dep; cbv [rev_append].
+    rewrite ?to_list_cast, ?to_list_cons, ?to_list_of_list.
+    rewrite !List.rev_append_rev; cbn; rewrite <-!List.app_assoc; trivial. }
+Qed.
+
+(** * Properties of the historical interface *)
 
 #[deprecated(since="9.3", note="If you would like stdlib to keep this definition, please open an issue.")]
 Definition cons_inj {A} {a1 a2} {n} {v1 v2 : t A n}
@@ -30,13 +312,13 @@ Definition cons_inj {A} {a1 a2} {n} {v1 v2 : t A n}
    with | eq_refl => conj eq_refl eq_refl
    end.
 
-#[deprecated(since="9.3", use=Vector92.inj_0)]
+#[deprecated(since="9.3", use=inj_0)]
 Lemma nil_spec {A} (v : t A 0) : v = [].
 Proof.
 apply (fun P E => case0 P E v). reflexivity.
 Defined.
 
-#[deprecated(since="9.3", use=Vector92.inj_S)]
+#[deprecated(since="9.3", use=inj_S)]
 Lemma eta {A} {n} (v : t A (S n)) : v = hd v :: tl v.
 Proof.
 apply (fun P IS => caseS P IS (n := n) v); intros; reflexivity.
@@ -47,24 +329,11 @@ is true for the one that use [lt] *)
 
 (** ** Properties of [nth] and [nth_order] *)
 
-Lemma getFin_inj [A n] (v w : t A n)
-  (H : forall i, VectorFin.getFin v i = VectorFin.getFin w i) : v = w.
-Proof.
-  apply Vector92.to_list_inj, List.nth_error_ext; intros i.
-  case (Nat.ltb_spec i n) as [Hi|].
-  { rewrite <-(Fin92.to_nat_of_nat i n Hi), !VectorFin.nth_error_to_list; auto using f_equal. }
-  { rewrite 2 (proj2 (List.nth_error_None _ _)); rewrite ?Vector92.length_to_list; auto. }
-Qed.
-
-Lemma getFin_inj_iff [A n] (v w : t A n) :
-  (forall i, VectorFin.getFin v i = VectorFin.getFin w i) <-> v = w.
-Proof. split; [apply getFin_inj | intros ->; auto]. Qed.
-
 #[deprecated(since="9.3", use=getFin_inj_iff)]
 Lemma eq_nth_iff A n (v1 v2: t A n):
   (forall p1 p2, p1 = p2 -> v1 [@ p1 ] = v2 [@ p2 ]) <-> v1 = v2.
 Proof.
-  rewrite <-getFin_inj_iff; repeat setoid_rewrite nth_92.
+  rewrite <-getFin_inj_iff; repeat setoid_rewrite nth_getFin.
   split; intros; subst; eauto.
 Qed.
 
@@ -223,45 +492,14 @@ Proof.
 now induction p.
 Qed.
 
-#[deprecated(since="9.3", use=Vector92.app_repeat_repeat)]
-Lemma append_const A (a : A) n m : (const a n) ++ (const a m) = const a (n + m).
-Proof.
-induction n as [|n IH].
-- reflexivity.
-- cbn. apply f_equal, IH.
-Qed.
+#[deprecated(since="9.3", use=app_repeat_repeat)]
+Abbreviation append_const := app_repeat_repeat (only parsing).
 
 (** ** Properties of [map] *)
 
-#[deprecated(since="9.3", use=Vector92.map_id)]
-Lemma map_id A: forall n (v : t A n),
-  map (fun x => x) v = v.
-Proof.
-intros n v; induction v as [|? ? v IHv]; simpl; [ | rewrite IHv ]; auto.
-Qed.
 
-#[deprecated(since="9.3", use=Vector92.map_map)]
-Lemma map_map A B C: forall (f:A->B) (g:B->C) n (v : t A n),
-  map g (map f v) = map (fun x => g (f x)) v.
-Proof.
-intros f g n v; induction v as [|? ? v IHv]; simpl; [ | rewrite IHv ]; auto.
-Qed.
 
-#[deprecated(since="9.3", use=Vector92.map_ext_in)]
-Lemma map_ext_in A B: forall (f g:A->B) n (v : t A n),
-  (forall a, In a v -> f a = g a) -> map f v = map g v.
-Proof.
-intros f g n v H; induction v as [|? ? v IHv].
-- reflexivity.
-- cbn. now f_equal; [|apply IHv; intros ??]; apply H; [left|right].
-Qed.
 
-#[deprecated(since="9.3", use=Vector92.map_ext)]
-Lemma map_ext A B: forall (f g:A->B), (forall a, f a = g a) ->
-  forall n (v : t A n), map f v = map g v.
-Proof.
-intros; apply map_ext_in; auto.
-Qed.
 
 Lemma nth_map {A B} (f: A -> B) {n} v (p1 p2: Fin.t n) (eq: p1 = p2):
   (map f v) [@ p1] = f (v [@ p2]).
@@ -271,14 +509,8 @@ subst p2; induction p1 as [n|n p1 IHp1].
 - revert n v p1 IHp1; refine (@caseS _  _ _); now simpl.
 Qed.
 
-#[deprecated(since="9.3", use=Vector92.map_app)]
-Lemma map_append A B: forall (f:A->B) n m (v: t A n) (w: t A m),
-  (map f (v ++ w)) = map f v ++ map f w.
-Proof.
-intros f n m v w. induction v as [|? ? v IHv].
-- reflexivity.
-- cbn. apply f_equal, IHv.
-Qed.
+#[deprecated(since="9.3", use=map_app_vec)]
+Abbreviation map_append := map_app_vec (only parsing).
 
 Lemma nth_map2 {A B C} (f: A -> B -> C) {n} v w (p1 p2 p3: Fin.t n):
   p1 = p2 -> p2 = p3 -> (map2 f v w) [@p1] = f (v[@p2]) (w[@p3]).
@@ -558,7 +790,7 @@ Proof.
 refine (@rectS _ _ _ _); now simpl.
 Qed.
 
-#[deprecated(since="9.3", use=Vector92.map_snoc)]
+#[deprecated(since="9.3", use=map_snoc)]
 Lemma map_shiftin A B: forall (f : A -> B) a n (v : t A n),
   map f (shiftin a v) = shiftin (f a) (map f v).
 Proof.
@@ -567,7 +799,7 @@ intros f a n v. induction v as [|b n v IH].
 - cbn. apply f_equal, IH.
 Qed.
 
-#[deprecated(since="9.3", use=Vector92.fold_right_snoc)]
+#[deprecated(since="9.3", use=fold_right_snoc)]
 Lemma fold_right_shiftin A B: forall (f : A -> B -> B) a b n (v : t A n),
   fold_right f (shiftin b v) a = fold_right f v (f b a).
 Proof.
@@ -594,60 +826,20 @@ Qed.
 
 (** ** Properties of [rev] *)
 
-#[deprecated(since="9.3", use=Vector92.rev_nil)]
-Lemma rev_nil A: rev (nil A) = [].
-Proof.
-unfold rev, rev_append.
-now rewrite (UIP_refl_nat _ (plus_n_O 0)), (UIP_refl_nat _ (Nat.tail_add_spec 0 0)).
-Qed.
 
-#[deprecated(since="9.3", use=Vector92.rev_cons)]
+#[deprecated(since="9.3", use=rev_cons_snoc)]
 Lemma rev_cons A: forall a n (v : t A n), rev (a :: v) = shiftin a (rev v).
-Proof.
-intros a n v. unfold rev, rev_append, eq_rect_r.
-rewrite !rew_compose.
-enough (H : forall m (w : t A m) k (E1 : _ = k) E2,
-  rew [t A] E2 in rev_append_tail v (shiftin a w) =
-  shiftin a (rew [t A] E1 in rev_append_tail v w)) by apply (H 0 []).
-induction v as [|b n v IH]; intros m w k E1 E2; cbn.
-- subst k. now rewrite (UIP_refl_nat _ E2).
-- apply (IH _ (b :: w)).
-Qed.
+Proof. intros; rewrite shiftin_snoc; apply rev_cons_snoc. Qed.
 
-#[deprecated(since="9.3", use=Vector92.rev_snoc)]
+#[deprecated(since="9.3", use=rev_snoc)]
 Lemma rev_shiftin A: forall a n (v : t A n),
   rev (shiftin a v) = a :: rev v.
-Proof.
-intros a n v. induction v as [|b n v IH]; cbn.
-- now rewrite rev_cons, !rev_nil.
-- now rewrite !rev_cons, IH.
-Qed.
+Proof. intros; rewrite shiftin_snoc; apply rev_snoc. Qed.
 
-#[deprecated(since="9.3", use=Vector92.rev_rev)]
-Lemma rev_rev A: forall n (v : t A n), rev (rev v) = v.
-Proof.
-intros n v. induction v as [|a n v IH].
-- now rewrite !rev_nil.
-- now rewrite rev_cons, rev_shiftin, IH.
-Qed.
 
-#[deprecated(since="9.3", use=Vector92.map_rev)]
-Lemma map_rev A B: forall (f : A -> B) n (v : t A n),
-  map f (rev v) = rev (map f v).
-Proof.
-intros f n v. induction v as [|a n v IH]; cbn.
-- now rewrite !rev_nil.
-- now rewrite !rev_cons, map_shiftin, IH.
-Qed.
 
-#[deprecated(since="9.3", use=Vector92.fold_right_rev)]
-Lemma fold_left_rev_right A B: forall (f:A->B->B) n (v : t A n) a,
-  fold_right f (rev v) a = fold_left (fun x y => f y x) a v.
-Proof.
-intros f n v. induction v as [|b n v IH]; intros a.
-- now rewrite rev_nil.
-- rewrite rev_cons, fold_right_shiftin. apply IH.
-Qed.
+#[deprecated(since="9.3", use=fold_right_rev)]
+Abbreviation fold_left_rev_right := fold_right_rev (only parsing).
 
 Lemma In_rev A: forall a n (v : t A n),
   In a (rev v) <-> In a v.
@@ -668,11 +860,8 @@ Qed.
 (** ** Properties of [to_list] *)
 
 #[deprecated(since="9.3", use=to_list_of_list)]
-Lemma to_list_of_list_opp {A} (l: list A): to_list (of_list l) = l.
-Proof. rewrite to_list_92, of_list_92; apply to_list_of_list. Qed.
+Abbreviation to_list_of_list_opp := to_list_of_list (only parsing).
 
-Lemma length_to_list A n (v : t A n): length (to_list v) = n.
-Proof. induction v; cbn; auto. Qed.
 
 Lemma of_list_to_list_opp A n (v: t A n):
   rew length_to_list _ _ _ in of_list (to_list v) = v.
@@ -686,12 +875,7 @@ induction v as [ | h n v IHv ].
   now etransitivity; [ | apply IHv].
 Qed.
 
-Lemma to_list_nil A : to_list (nil A) = List.nil.
-Proof. reflexivity. Qed.
 
-Lemma to_list_cons A h n (v : t A n):
-  to_list (cons A h n v) = List.cons h (to_list v).
-Proof. reflexivity. Qed.
 
 Lemma to_list_nil_iff A v:
   to_list v = List.nil <-> v = nil A.
@@ -701,35 +885,15 @@ split; intro H.
 - subst. apply to_list_nil.
 Qed.
 
-Lemma to_list_inj A n (v w : t A n):
-  to_list v = to_list w -> v = w.
-Proof.
-revert v. induction w as [| w0 n w IHw].
-- apply to_list_nil_iff.
-- intros v H. rewrite (eta v) in H.
-  injection H as [=H0 H1%IHw]. subst. apply eta.
-Qed.
 
-Lemma to_list_hd A n (v : t A (S n)) d:
-  hd v = List.hd d (to_list v).
-Proof. now rewrite (eta v). Qed.
+#[deprecated(since="9.3", use=hd_to_list)]
+Abbreviation to_list_hd := hd_to_list (only parsing).
 
-Lemma to_list_last A n (v : t A (S n)) d:
-  last v = List.last (to_list v) d.
-Proof.
-apply rectS with (v:=v); [reflexivity|].
-intros a k u IH.
-rewrite to_list_cons.
-simpl List.last.
-now rewrite <- IH, (eta u).
-Qed.
+#[deprecated(since="9.3", use=last_to_list)]
+Abbreviation to_list_last := last_to_list (only parsing).
 
-Lemma to_list_const A (a : A) n:
-  to_list (const a n) = List.repeat a n.
-Proof.
-induction n as [ | n IHn ]; [reflexivity|].
-now cbn; rewrite <- IHn.
-Qed.
+#[deprecated(since="9.3", use=to_list_repeat)]
+Abbreviation to_list_const := to_list_repeat (only parsing).
 
 Lemma to_list_nth_order A n (v : t A n) p (H : p < n) d:
   nth_order v H = List.nth p (to_list v) d.
@@ -740,14 +904,9 @@ induction v as [|a n v IH].
 - intros [|p] ?; [ reflexivity | apply IH ].
 Qed.
 
-Lemma to_list_tl A n (v : t A (S n)):
-  to_list (tl v) = List.tl (to_list v).
-Proof. now rewrite (eta v). Qed.
 
 #[deprecated(since="9.3", use=to_list_app)]
-Lemma to_list_append A n m (v1 : t A n) (v2 : t A m):
-  to_list (append v1 v2) = List.app (to_list v1) (to_list v2).
-Proof. rewrite !to_list_92, append_92, to_list_app; trivial. Qed.
+Abbreviation to_list_append := to_list_app (only parsing).
 
 Lemma to_list_rev_append_tail A n m (v1 : t A n) (v2 : t A m):
   to_list (rev_append_tail v1 v2) = List.rev_append (to_list v1) (to_list v2).
@@ -755,21 +914,9 @@ Proof. now revert m v2; induction v1 as [ | ? ? ? IHv1 ]; intros; [ | simpl; rew
 
 Lemma to_list_rev_append A n m (v1 : t A n) (v2 : t A m):
   to_list (rev_append v1 v2) = List.rev_append (to_list v1) (to_list v2).
-Proof. unfold rev_append; rewrite <- (Nat.tail_add_spec n m); apply to_list_rev_append_tail. Qed.
+Proof. cbv [rev_append]. rewrite to_list_cast, to_list_of_list; trivial. Qed.
 
-Lemma to_list_rev A n (v : t A n):
-  to_list (rev v) = List.rev (to_list v).
-Proof.
-unfold rev; rewrite (plus_n_O n); unfold eq_rect_r; simpl.
-now rewrite to_list_rev_append, List.rev_alt.
-Qed.
 
-Lemma to_list_map A B (f : A -> B) n (v : t A n) :
-  to_list (map f v) = List.map f (to_list v).
-Proof.
-induction v; cbn; [reflexivity|].
-now cbn; f_equal.
-Qed.
 
 Lemma to_list_fold_left A B f (b : B) n (v : t A n):
   fold_left f b v = List.fold_left f (to_list v) b.
@@ -799,13 +946,6 @@ split; intros HF.
     destruct v; inversion Heql; subst; now constructor; auto.
 Qed.
 
-Lemma to_list_In A a n (v : t A n):
-  In a v <-> List.In a (to_list v).
-Proof.
-split.
-- intros HIn; induction HIn; now constructor.
-- induction v; intros HIn; inversion HIn; subst; constructor; auto.
-Qed.
 
 Lemma to_list_Forall2 A B P n (v1 : t A n) (v2 : t B n) :
   Forall2 P v1 v2 <-> List.Forall2 P (to_list v1) (to_list v2).

@@ -10,7 +10,6 @@
 
 (** N.B.: Using this encoding of vectors is discouraged.
 See <https://github.com/coq/stdlib/blob/master/theories/Vectors/Vector.v>. *)
-Attributes warn(cats="stdlib vector", note="Using Vector.t is known to be technically difficult, see <https://github.com/rocq-prover/stdlib/blob/master/theories/Vectors/Vector.v>.").
 
 (** Equalities and Vector relations
 
@@ -67,5 +66,3 @@ Section BEQ.
 
 End BEQ.
 
-#[deprecated(since="9.3", use=Vector92.cast)]
-Abbreviation cast := Vector92.cast (only parsing).

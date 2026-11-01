@@ -1,5 +1,5 @@
 (* The deprecated Vector and Fin interfaces still work on top of
-   Compat.Vector92 and Compat.Fin92: the same type, the historical names, and
+   the new vec and fin interfaces: the same type, the historical names, and
    the historical argument structure of the constructors. *)
 
 Set Warnings "-deprecated".

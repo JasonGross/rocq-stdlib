@@ -8,8 +8,7 @@
 (*         *     (see LICENSE file for the text of the license)         *)
 (************************************************************************)
 
-From Stdlib Require Import PeanoNat.
-From Stdlib Require Import Compat.Fin92.
+From Stdlib Require Import PeanoNat Peano_dec.
 #[local] Set Warnings "-deprecated".
 From Stdlib Require Arith_base.
 
@@ -24,7 +23,6 @@ An alternative implementation can be found for instance in
 https://github.com/math-comp/math-comp/blob/master/boot/fintype.v
 One can read more about this type in section 7.4 of this book:
 https://zenodo.org/record/4282710#.X_q4aGso-yU . *)
-Attributes warn(cats="stdlib vector", note="Alternatives to Fin.t are available, see <https://github.com/rocq-prover/stdlib/blob/master/theories/Vectors/Fin.v>.").
 
 (** [fin n] is a way to represent \[1 .. n\]
 
@@ -36,21 +34,150 @@ the n-uplet. If [f] is the k-th element of the (n-1)-uplet, [FS f] is the
    Institution: PPS, INRIA 12/2010-01/2012-07/2012
 *)
 
-#[deprecated(since="9.3", use=Fin92.fin)]
-Abbreviation t := Fin92.fin (only parsing).
-#[deprecated(since="9.3", use=Fin92.finO)]
-Abbreviation F1 := finO (only parsing).
-#[deprecated(since="9.3", use=Fin92.finS)]
-Abbreviation FS := finS (only parsing).
-#[deprecated(since="9.3", use=Fin92.t_ind)]
-Abbreviation t_ind := Fin92.t_ind (only parsing).
-#[deprecated(since="9.3", use=Fin92.t_rect)]
-Abbreviation t_rect := Fin92.t_rect (only parsing).
-#[deprecated(since="9.3", use=Fin92.t_rec)]
-Abbreviation t_rec := Fin92.t_rec (only parsing).
-#[deprecated(since="9.3", use=Fin92.t_sind)]
-Abbreviation t_sind := Fin92.t_sind (only parsing).
+(** * The new interface: [fin n]
 
+    Proofs about [fin] go through the injective conversion [val] to [nat]
+    and the small inversions [inj_0] and [inj_S], not through dependent
+    pattern matching. The historical interface ([t], [F1], [FS], [to_nat],
+    [of_nat_lt], ...) follows below; it is deprecated. *)
+
+Inductive fin : nat -> Type :=
+| finO {n}             : fin (S n)
+| finS {n} (_ : fin n) : fin (S n).
+Notation fin0 := finO (only parsing).
+
+(** [val i] is the natural number that [i] represents. *)
+Fixpoint val {n} (i : fin n) : nat :=
+  match i with
+  | finO => 0
+  | finS i => S (val i)
+  end.
+Coercion val : fin >-> nat.
+
+Definition cast {m} (v: fin m) {n} : m = n -> fin n :=
+  match Nat.eq_dec m n with
+  | left Heq => fun _ => eq_rect m _ v n Heq
+  | right Hneq => fun Heq => False_rect _ (Hneq Heq)
+  end.
+
+(** [add_nat n i] is the element [n + i] of [fin (n + m)]. *)
+Fixpoint add_nat (n : nat) {m} (i : fin m) {struct n} : fin (n + m) :=
+  match n with
+  | 0 => i
+  | S n => finS (add_nat n i)
+  end.
+
+(** [relax n i] is the element [i] of [fin (m + n)]. *)
+Section Relax.
+Context (n : nat).
+Fixpoint relax {m} (i : fin m) : fin (m + n) :=
+  match i in fin m return fin (m + n) with
+  | finO => finO
+  | finS i => finS (relax i)
+  end.
+End Relax.
+
+Lemma mk_subproof n i : i < n -> i + S (n - S i) = n.
+Proof.
+  intros H. rewrite Nat.add_succ_r, <-Nat.add_succ_l, Nat.add_comm.
+  apply Nat.sub_add, H.
+Qed.
+
+(** [mk n i H] is the element [i] of [fin n]. *)
+Definition mk n (i : nat) (H : i < n) : fin n :=
+  cast (add_nat i (@fin0 (n-S i))) (mk_subproof n i H).
+
+(** [last n] is the last element of [fin (S n)]. *)
+Fixpoint last (n : nat) : fin (S n) :=
+  match n with
+  | O => finO
+  | S n => finS (last n)
+  end.
+
+Lemma inj_0 (i : fin 0) : False.
+Proof. exact (match i with end). Qed.
+
+Lemma inj_S {n} (i : fin (S n)) : i = finO \/ exists j, i = finS j.
+Proof.
+  pattern i; refine ( (* destruct i, but using elaborator's small inversions *)
+  match i in fin (S n) return forall P, P finO -> (forall i, P (finS i)) -> P i with
+  | finO | _ => _ end _ _ _); eauto.
+Qed.
+
+Lemma val_inj [n] (i j : fin n) : val i = val j -> i = j.
+Proof.
+  induction i; pose proof inj_S j; firstorder subst; try discriminate;
+    cbn [val] in *; eauto using f_equal.
+Qed.
+
+Lemma val_inj_iff [n] (i j : fin n) : val i = val j <-> i = j.
+Proof. split; try apply val_inj; congruence. Qed.
+
+Lemma val_inj_dep [n] (i : fin n) [m] (j : fin m) : n = m -> val i = val j ->
+  existT _ _ i = existT _ _ j.
+Proof. destruct 1; auto using f_equal, val_inj. Qed.
+
+Lemma val_0 n : val (@finO n) = 0.
+Proof. trivial. Qed.
+
+Lemma val_S [n] (i : fin n) : val (finS i) = S (val i).
+Proof. trivial. Qed.
+
+Lemma val_bound [n] (i : fin n) : val i < n.
+Proof.
+  induction i; cbn [val]. { apply Nat.lt_0_succ. }
+  rewrite <-Nat.succ_lt_mono. apply IHi.
+Qed.
+
+Lemma val_eq_rect [m n] (p : m = n) i : val (eq_rect m fin i n p) = val i.
+Proof. case p; trivial. Qed.
+
+Lemma val_cast [m n] (p : m = n) (i : fin m) : val (cast i p) = val i.
+Proof. cbv[cast]. case Nat.eq_dec; intros; [apply val_eq_rect|contradiction]. Qed.
+
+Lemma cast_ext [m n] (p q : m = n) (i : fin m) : cast i p = cast i q.
+Proof. apply val_inj; rewrite 2 val_cast; trivial. Qed.
+
+Lemma val_add_nat n [m] (i : fin m) : val (add_nat n i) = n+i.
+Proof. induction n; cbn [val add_nat Nat.add]; auto. Qed.
+
+Lemma val_relax n [m] (i : fin m) : val (relax n i) = i.
+Proof. induction i; cbn [val relax]; auto. Qed.
+
+Lemma val_mk i n p : val (mk n i p) = i.
+Proof.
+  cbv [mk].
+  rewrite val_cast, val_add_nat, val_0, Nat.add_0_r; trivial.
+Qed.
+
+Lemma mk_val [n] i p : mk n (val i) p = i.
+Proof. apply val_inj, val_mk. Qed.
+
+Lemma mk_ext [n i] (p q : i < n) : mk n i p = mk n i q.
+Proof. apply cast_ext. Qed.
+
+Lemma finS_inj {n} (x y : fin n) : finS x = finS y -> x = y.
+Proof. rewrite <-!val_inj_iff; cbn [val]; congruence. Qed.
+
+Lemma val_last n : val (last n) = n.
+Proof. induction n; cbn [val last]; auto. Qed.
+
+(** * The historical interface, deprecated *)
+
+#[deprecated(since="9.3", use=fin)]
+Abbreviation t := fin (only parsing).
+#[deprecated(since="9.3", use=finO)]
+Abbreviation F1 := finO (only parsing).
+#[deprecated(since="9.3", use=finS)]
+Abbreviation FS := finS (only parsing).
+#[deprecated(since="9.3", use=fin_ind)]
+Abbreviation t_ind := fin_ind (only parsing).
+#[deprecated(since="9.3", use=fin_rect)]
+Abbreviation t_rect := fin_rect (only parsing).
+#[deprecated(since="9.3", use=fin_rec)]
+Abbreviation t_rec := fin_rec (only parsing).
+#[deprecated(since="9.3", use=fin_sind)]
+Abbreviation t_sind := fin_sind (only parsing).
 
 Section SCHEMES.
 #[deprecated(since="9.3", note="Please open an issue if you would like stdlib to keep this definition.")]
@@ -97,6 +224,7 @@ Definition rect2 (P : forall {n} (a b : t n), Type)
 
 End SCHEMES.
 
+#[deprecated(since="9.3", use=finS_inj)]
 Definition FS_inj {n} (x y: t n) (eq: FS x = FS y): x = y :=
 match eq in _ = a return
   match a as a' in t m return match m with |0 => Prop |S n' => t n' -> Prop end
@@ -105,6 +233,7 @@ match eq in _ = a return
 end.
 
 (** [to_nat f] = p iff [f] is the p{^ th} element of [fin m]. *)
+#[deprecated(since="9.3", use=val)]
 Fixpoint to_nat {m} (n : t m) : {i | i < m} :=
   match n with
     |@F1 j => exist _ 0 (Nat.lt_0_succ j)
@@ -113,6 +242,7 @@ Fixpoint to_nat {m} (n : t m) : {i | i < m} :=
 
 (** [of_nat p n] answers the p{^ th} element of [fin n] if p < n or a proof of
 p >= n else *)
+#[deprecated(since="9.3", use=mk)]
 Fixpoint of_nat (p n : nat) : (t n) + { exists m, p = n + m } :=
   match n with
    |0 => inright _ (ex_intro _ p eq_refl)
@@ -128,6 +258,7 @@ Fixpoint of_nat (p n : nat) : (t n) + { exists m, p = n + m } :=
 
 (** [of_nat_lt p n H] answers the p{^ th} element of [fin n]
 it behaves much better than [of_nat p n] on open term *)
+#[deprecated(since="9.3", use=mk)]
 Fixpoint of_nat_lt {p n : nat} : p < n -> t n :=
   match n with
     |0 => fun H : p < 0 => False_rect _ (PeanoNat.Nat.nlt_0_r p H)
@@ -137,11 +268,13 @@ Fixpoint of_nat_lt {p n : nat} : p < n -> t n :=
     end
   end.
 
+#[deprecated(since="9.3", use=mk_ext)]
 Lemma of_nat_ext {p}{n} (h h' : p < n) : of_nat_lt h = of_nat_lt h'.
 Proof.
  now rewrite (Peano_dec.le_unique _ _ h h').
 Qed.
 
+#[deprecated(since="9.3", use=mk_val)]
 Lemma of_nat_to_nat_inv {m} (p : t m) : of_nat_lt (proj2_sig (to_nat p)) = p.
 Proof.
 induction p as [|? p]; simpl.
@@ -149,6 +282,7 @@ induction p as [|? p]; simpl.
 - destruct (to_nat p); simpl in *. f_equal. subst p. apply of_nat_ext.
 Qed.
 
+#[deprecated(since="9.3", use=val_mk)]
 Lemma to_nat_of_nat {p}{n} (h : p < n) : to_nat (of_nat_lt h) = exist _ p h.
 Proof.
 revert p h. induction n as [|n IHn].
@@ -156,6 +290,7 @@ revert p h. induction n as [|n IHn].
 - intros [|p] h; cbn; [|rewrite IHn]; f_equal; apply Peano_dec.le_unique.
 Qed.
 
+#[deprecated(since="9.3", use=val_inj)]
 Lemma to_nat_inj {n} (p q : t n) :
  proj1_sig (to_nat p) = proj1_sig (to_nat q) -> p = q.
 Proof.
@@ -165,17 +300,17 @@ Proof.
  revert hp hq. rewrite H. apply of_nat_ext.
 Qed.
 
-#[deprecated(since="9.3", use=Fin92.to_nat)]
-Lemma to_nat_92 {n} (p : t n) : proj1_sig (to_nat p) = Fin92.to_nat p.
+#[deprecated(since="9.3", use=val)]
+Lemma to_nat_val {n} (p : t n) : proj1_sig (to_nat p) = val p.
 Proof.
- induction p as [|? p IHp]; cbn [to_nat Fin92.to_nat]; trivial.
+ induction p as [|? p IHp]; cbn [to_nat val]; trivial.
  destruct (to_nat p); cbn in *; congruence.
 Qed.
 
-#[deprecated(since="9.3", use=Fin92.of_nat)]
-Lemma of_nat_lt_92 {p n} (h : p < n) : of_nat_lt h = Fin92.of_nat n p h.
+#[deprecated(since="9.3", use=mk)]
+Lemma of_nat_lt_mk {p n} (h : p < n) : of_nat_lt h = mk n p h.
 Proof.
- apply Fin92.to_nat_inj. rewrite Fin92.to_nat_of_nat, <-to_nat_92, to_nat_of_nat; trivial.
+ apply val_inj. rewrite val_mk, <-to_nat_val, to_nat_of_nat; trivial.
 Qed.
 
 
@@ -195,7 +330,7 @@ end.
 
 (** The p{^ th} element of [fin m] viewed as the p{^ th} element of
 [fin (m + n)] *)
-#[deprecated(since="9.3", use=Fin92.relax)]
+#[deprecated(since="9.3", use=relax)]
 Abbreviation L n := (relax n) (only parsing).
 
 #[deprecated(since="9.3", note="Please open an issue if you would like stdlib to keep this definition.")]
@@ -230,7 +365,7 @@ Defined.
 
 (** The p{^ th} element of [fin m] viewed as the (n + p){^ th} element of
 [fin (n + m)] *)
-#[deprecated(since="9.3", use=Fin92.add_nat)]
+#[deprecated(since="9.3", use=add_nat)]
 Abbreviation R n := (add_nat n) (only parsing).
 
 #[deprecated(since="9.3", note="Please open an issue if you would like stdlib to keep this definition.")]
@@ -358,19 +493,4 @@ Proof.
 case_eq (eqb x y); intros.
 - left; now apply eqb_eq.
 - right. intros Heq. apply <- eqb_eq in Heq. congruence.
-Defined.
-
-Definition cast: forall {m} (v: t m) {n}, m = n -> t n.
-Proof.
-refine (fix cast {m} (v: t m) {struct v} :=
- match v in t m' return forall n, m' = n -> t n with
- |F1 => fun n => match n with
-   | 0 => fun H => False_rect _ _
-   | S n' => fun H => F1
- end
- |FS f => fun n => match n with
-   | 0 => fun H => False_rect _ _
-   | S n' => fun H => FS (cast f n' (f_equal pred H))
- end
-end); discriminate.
 Defined.
