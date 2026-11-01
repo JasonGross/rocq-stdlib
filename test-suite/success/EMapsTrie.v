@@ -1,16 +1,16 @@
-(* Extensional tries (EMaps.Trie): interface instance and computation checks *)
+(* Extensional tries (EMaps.Trie, FSets.FMapTrie): interface instance and computation checks *)
 From Stdlib Require Import PArith List String.
-From Stdlib Require Import OrderedTypeEx FMapInterface FMapFacts EMaps.Trie.
+From Stdlib Require Import OrderedTypeEx FMapInterface FMapFacts EMaps.Trie FMapTrie.
 Import ListNotations.
 #[local] Open Scope positive_scope.
 #[local] Open Scope string_scope.
 
 (* The tries implement [FMapInterface.S], including the facts functors. *)
-Module M : S with Module E := PositiveOrderedTypeBits := Trie.FMap.
-Module F := FMapFacts.Properties Trie.FMap.
-Module OF := FMapFacts.OrdProperties Trie.FMap.
+Module M : S with Module E := PositiveOrderedTypeBits := TrieMap.
+Module F := FMapFacts.Properties TrieMap.
+Module OF := FMapFacts.OrdProperties TrieMap.
 
-Import Trie.FMap.
+Import TrieMap.
 
 Definition m1 := add 5 "five" (add 1 "one" (add 3 "three" (empty string))).
 
@@ -45,4 +45,4 @@ Check eq_refl : add 3 "a" (add 1 "b" (empty string)) = add 1 "b" (add 3 "a" (emp
 Check eq_refl : add 1 "a" (add 1 "b" (empty string)) = add 1 "a" (empty string).
 
 Goal forall A (m m' : t A), Equal m m' -> m = m'.
-Proof. intros. now apply Trie.FMapAdditionalFacts.Equal_eq. Qed.
+Proof. intros. now apply TrieMapAdditionalFacts.Equal_eq. Qed.
