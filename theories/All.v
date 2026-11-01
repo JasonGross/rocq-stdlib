@@ -373,7 +373,10 @@ From Stdlib Require Export Wellfounded.Lexicographic_Product.
 From Stdlib Require Export Wellfounded.Union.
 From Stdlib Require Export Wellfounded.Well_Ordering.
 From Stdlib Require Export Wellfounded.Wellfounded.
+From Stdlib Require Export Compat.Fin92.
 From Stdlib Require Export Vectors.Fin.
+From Stdlib Require Export Compat.Vector92.
+From Stdlib Require Export Vectors.VectorFin.
 From Stdlib Require Export Vectors.VectorDef.
 From Stdlib Require Export Vectors.VectorSpec.
 From Stdlib Require Export Vectors.VectorEq.

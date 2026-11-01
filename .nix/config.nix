@@ -284,6 +284,9 @@ with builtins; with (import <nixpkgs> {}).lib; {
       mathcomp-real-closed.override.version = "master";
       stdlib-all.job = true;  # check that theories/All.v is up to date
       mathcomp-algebra-tactics.job = false;  # no longer in Rocq CI since Rocq 9.3
+      # CI overlay for #170: Equations master + JasonGross/Coq-Equations#fable/abbrev-pattern-vars
+      equations.override.version = "JasonGross:fable/abbrev-pattern-vars";
+      equations-test.override.version = "JasonGross:fable/abbrev-pattern-vars";
     }; };
     "rocq-9.3" = { rocqPackages = common-bundles // {
       rocq-core.override.version = "9.3";

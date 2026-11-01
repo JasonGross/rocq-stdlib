@@ -107,11 +107,20 @@ There is also an <a href="genindex.html">alphabetical index</a> of all modules a
 
 <dl>
   <div id="EqDep_dec"><dt><a href="Stdlib.Logic.Eqdep_dec.html">EqDep_dec</a></dt><dd>Uniqueness of proofs of decidable equalities.</dd></div>
+  <div id="Vector92"><dt><a href="Stdlib.Compat.Vector92.html">Vector92</a></dt>
+    <dd>Lists with length-dependent type, constructed as an inductive type indexed by a <code>nat</code> (the length). This construction is uniquely suitable for nesting with other inductive types. Proofs about <code>vec</code> go through the injective conversion <code>to_list</code> and the small inversions <code>inj_0</code> and <code>inj_S</code>, not through dependent pattern matching. If nesting is not needed, consider using <code>list</code>, potentially paired with a proof about its length. This file replaces <a href="#Vector">Vector</a>.</dd>
+  </div>
+  <div id="Fin92"><dt><a href="Stdlib.Compat.Fin92.html">Fin92</a></dt>
+    <dd>Bounded natural numbers, constructed as an inductive type indexed by a <code>nat</code> (the strict upper bound). Proofs about <code>fin</code> go through the injective conversion <code>to_nat</code>. <code>fin n</code> is inhabited only if <code>n</code> is nonzero, so a natural number cannot always be converted to <code>fin</code> (unlike <code>Zmod 0</code>, which is isomorphic to <code>Z</code>). This file replaces <a href="#Fin">Fin</a>.</dd>
+  </div>
+  <div id="VectorFin"><dt><a href="Stdlib.Vector.VectorFin.html">VectorFin</a></dt>
+    <dd>Indexing of a <a href="#Vector92">vector</a> by a <a href="#Fin92">bounded natural number</a>: <code>getFin</code>, <code>putFin</code>, and their variants <code>getLt</code>, <code>putLt</code> that take a proof of <code>i &lt; n</code>.</dd>
+  </div>
   <div id="Vector"><dt><a href="Stdlib.Vector.Vector.html">Vector</a></dt>
-    <dd>Lists with length-dependent type, constructed as an inductive type indexed by a <code>nat</code> (the length). This construction is uniquely suitable for nesting with other inductive types, but direct proofs about it require skilled use of dependent pattern matching with an <code>in</code> clause. Indirect reasoning about vectors converted to lists is often preferred. If nesting is not needed, consider using <code>list</code>, potentially paired with a proof about its length.</dd>
+    <dd>Deprecated interface to <a href="#Vector92">Vector92</a>: the same type, with the historical names and argument structure, and with the operations that have no counterpart in <code>Vector92</code>. Direct proofs about it require skilled use of dependent pattern matching with an <code>in</code> clause; use <code>Vector92</code> instead.</dd>
   </div>
   <div id="Fin"><dt><a href="Stdlib.Vector.Fin.html">Fin</a></dt>
-    <dd>Bounded natural numbers, constructed as an inductive type indexed by a <code>nat</code> (the strict upper bound). This construction matches the index space of <a href="#Vector">Vector</a>, but again direct proofs about it require skilled use of dependent pattern matching with an <code>in</code> clause. Further, <code>Fin.t n</code> is inhabited only if <code>n</code> is nonzero, so a natural number cannot be a always converted to <code>Fin.t</code> (unlike <code>Zmod 0</code>, which is isomorphic to <code>Z</code>).</dd>
+    <dd>Deprecated interface to <a href="#Fin92">Fin92</a>: the same type, with the historical names, and with the operations that have no counterpart in <code>Fin92</code>.</dd>
   </div>
 </dl>
 
