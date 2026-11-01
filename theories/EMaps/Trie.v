@@ -1,9 +1,3 @@
-(* TODO: move *)
-Definition option_bind {A B} (f : A -> option B) (o : option A) : option B :=
-  match o with None => None | Some a => f a end.
-
-Require Import Coq.PArith.PArith.
-
 (** * Extensional binary tries based on a canonical representation *)
 (* Adapted from <https://www.cs.princeton.edu/~appel/papers/ptree.pdf> *)
 
@@ -12,6 +6,18 @@ Require Import Coq.PArith.PArith.
             Andres Erbsen
    Copyright: Andrew W. Appel and Inria and Andres Erbsen.
    License: BSD-3-Clause. *)
+
+(** A [trie A] is a finite map from [positive] to [A]. The representation is
+    canonical: two tries that agree on [get] are equal ([extensionality]).
+    The module [FMap] at the end of this file packages the tries as an
+    instance of [FMapInterface.S] with keys ordered by
+    [PositiveOrderedTypeBits]. *)
+
+From Stdlib Require Import Bool PeanoNat PArith List SetoidList.
+From Stdlib Require Import OrderedType OrderedTypeEx FMapInterface.
+
+Definition option_bind {A B} (f : A -> option B) (o : option A) : option B :=
+  match o with None => None | Some a => f a end.
 
 (** Nonempty branches. Each constructor is of the form [NodeXYZ], where the
    bit [X] says whether there is a left subtree, [Y] whether there is a value
@@ -243,8 +249,8 @@ End MapFilter.
 Section Combine.
 Context {A B C : Type} (f : option A -> option B -> option C).
 
-Local Notation combine'_l m := (map_filter (fun a => f (Some a) None) (Some m)).
-Local Notation combine'_r m := (map_filter (fun b => f None (Some b)) (Some m)).
+Local Abbreviation combine'_l m := (map_filter (fun a => f (Some a) None) (Some m)).
+Local Abbreviation combine'_r m := (map_filter (fun b => f None (Some b)) (Some m)).
 
 Let Fixpoint combine'' (m1 : branch A) (m2 : branch B) {struct m1} : trie C.
 Proof. (* 49 cases *)
@@ -282,8 +288,6 @@ End Combine.
 
 (** Conversions *)
 
-Require Import Coq.Lists.List.
-(* TODO: move *)
 Module Option.
   Definition to_list {A} (o : option A) : list A :=
     match o with
@@ -300,75 +304,719 @@ Definition values {A} : trie A -> list A :=
 
 Definition to_list {A} (m : trie A) := List.combine (keys m) (values m).
 
-Require Coq.Lists.List OrderedType OrderedTypeEx FMapInterface.
-Module FMap (* <: FMapInterface.S with Module E:=OrderedTypeEx.PositiveOrderedTypeBits *).
-  Module E := OrderedTypeEx.PositiveOrderedTypeBits.
-  Definition key := positive.
+(** * Tries as an instance of [FMapInterface.S] *)
+
+(** The functions below that need the key of each binding ([elements],
+    [fold], [mapi]) carry the current path in the trie as an extra
+    [positive] argument, in reverse order, as in [FMapPositive]. The proofs
+    follow [FMapPositive]: [trie_ind] replaces the structural induction on
+    trees, and one [_Node] equation per operation replaces [simpl]. *)
+
+#[local] Set Implicit Arguments.
+#[local] Unset Strict Implicit.
+
+Module FMap <: S with Module E := PositiveOrderedTypeBits.
+
+  Module E := PositiveOrderedTypeBits.
+  Module ME := KeyOrderedType E.
+
+  Definition key := positive : Type.
+
+  (** Reverses the positive [y] and concatenate it with [x] *)
+
+  Fixpoint rev_append (y x : positive) : positive :=
+    match y with
+    | xH => x
+    | xI y => rev_append y (xI x)
+    | xO y => rev_append y (xO x)
+    end.
+  Local Infix "@" := rev_append (at level 60).
+  Definition rev x := x@xH.
+
   Definition t := trie.
-  Definition empty := empty.
-  Definition is_empty {A} (m : trie A) := match m with None => true | _ => false end.
-  Definition find {A} := @get A.
-  Definition remove {A} := @remove A.
-  Definition add {A} := @set A.
-  Definition mem {A} k m := match @get A k m with Some _ => true | _ => false end.
-  Definition map {A B} f := @map_filter A B (fun a => Some (f a)).
-Axiom mapi : forall elt elt' : Type,
- (Trie.FMap.key -> elt -> elt') -> Trie.FMap.t elt -> Trie.FMap.t elt'.
-  Definition map2 := @combine.
-  Import List ListNotations.
-    Definition values {A} := @trie_ind A (fun _ => list A) nil (fun _ xs o _ ys _ => xs++(match o with Some a => [a] | _ => [] end)++ys).
-Axiom elements : forall elt : Type, Trie.FMap.t elt -> list (Trie.FMap.key * elt).
-  Definition cardinal {A} := @trie_ind A (fun _ => nat) O (fun _ x o _ y _ => x+(match o with Some a => 1|_=> O end)+y).
-Axiom fold : forall elt A : Type,
- (Trie.FMap.key -> elt -> A -> A) -> Trie.FMap.t elt -> A -> A.
-  Definition equal {A} eqA ma mb := @trie_ind bool (fun _ => bool) true (fun _ x o _ y _ => x&&(match o with Some a => a|_=> true end)&&y)%bool (@Trie.combine A A bool (fun a b => match a, b with None, None => Some true | Some a, Some b => Some (eqA a b) | _, _ => Some false end) ma mb).
-  Definition Equal {A} := @eq (trie A).
-  Definition MapsTo {A} k v m := @get A k m = Some v.
-  Definition In {A} k m := exists v, @get A k m = Some v.
-  Definition Empty {A} m := forall (a : key)(e:A) , ~ MapsTo a e m.
-  Definition eq_key {A} (p p':positive*A) := fst p = fst p'.
-  Definition eq_key_elt {A} (p p':positive*A) := fst p = fst p' /\ snd p = snd p'.
 
-  Lemma MapsTo_1 {A} m x y e : x = y -> @MapsTo A x e m -> MapsTo y e m.
-  Proof. congruence. Qed.
-  Lemma mem_1 {A} m k : In k m -> @mem A k m = true.
-  Proof. intros [v H]. cbv [mem]. rewrite H. trivial. Qed.
-  Lemma mem_2 {A} m k : @mem A k m = true -> In k m.
-  Proof. cbv [mem In]. case get eqn:?; eauto; discriminate. Qed.
-  Lemma empty_1 {A} : Empty (empty A). cbv. inversion 2. Qed.
-  Lemma is_empty_1 {A} m : @Empty A m -> is_empty m = true.
-  Proof. intros; erewrite (extensionality_empty m); trivial.
-    intros i. specialize (H i). case (get i m) eqn:? in *; try congruence. Qed.
-  Lemma is_empty_2 {A} m : @is_empty A m = true -> Empty m.
-  Proof. case m; try discriminate. Qed.
+  Section A.
+  Variable A:Type.
 
-  Lemma add_1 {A} m x y e (H : x = y) : MapsTo y e (@set A x e m).
-  Proof. subst y. apply get_set_same.  Qed.
-  Lemma add_2 {A} m x y e e' (H : ~ x = y) : MapsTo y e m -> MapsTo y e (@set A x e' m).
-  Proof. cbv [MapsTo]. rewrite get_set_diff; congruence. Qed.
-  Lemma add_3 {A} m x y e e' (H : ~ x = y) : MapsTo y e (add x e' m) -> @MapsTo A y e m.
-  Proof. cbv [MapsTo]. rewrite get_set_diff; congruence. Qed.
+  Definition empty : t A := empty A.
 
-Parameter remove_1 : False.
-Parameter remove_2 : False.
-Parameter remove_3 : False.
-Parameter find_1 : False.
-Parameter find_2 : False.
-Parameter elements_1 : False.
-Parameter elements_2 : False.
-Parameter elements_3w : False.
-Parameter cardinal_1 : False.
-Parameter fold_1 : False.
-Definition Equiv := False.
-Definition Equivb := False.
-Parameter equal_1 : False.
-Parameter equal_2 : False.
-Parameter map_1 : False.
-Parameter map_2 : False.
-Parameter mapi_1 : False.
-Parameter mapi_2 : False.
-Parameter map2_1 : False.
-Parameter map2_2 : False.
-Definition lt_key {A} (x y:_*A) := E.lt (fst x) (fst y).
-Parameter elements_3 : False.
+  Definition is_empty (m : t A) := match m with None => true | _ => false end.
+
+  Definition find (i : key) (m : t A) : option A := get i m.
+
+  Definition mem (i : key) (m : t A) : bool :=
+    match get i m with Some _ => true | _ => false end.
+
+  Definition add (i : key) (v : A) (m : t A) : t A := set i v m.
+
+  Definition remove (i : key) (m : t A) : t A := remove i m.
+
+  (** [elements], with the reversed path [i] and an accumulator;
+      [branch_map] avoids spelling out the seven constructors of [branch]. *)
+
+  Fixpoint xelements' (m : branch A) (i : positive) (acc : list (key*A))
+    {struct m} : list (key*A) :=
+    branch_map (fun l o r =>
+      let acc := match r with Some r => xelements' r (xI i) acc | None => acc end in
+      let acc := match o with Some e => (rev i, e) :: acc | None => acc end in
+      match l with Some l => xelements' l (xO i) acc | None => acc end) m.
+
+  Definition xelements (m : t A) (i : positive) (acc : list (key*A)) :=
+    match m with Some m => xelements' m i acc | None => acc end.
+
+  Definition elements (m : t A) := xelements m xH nil.
+
+  (** [cardinal] *)
+
+  Definition cardinal : t A -> nat :=
+    trie_ind (fun _ => nat) O (fun _ x o _ y _ => x+(match o with Some a => 1|_=> O end)+y).
+
+  (** Specification predicates, as in [FMapInterface] *)
+
+  Definition MapsTo (i:key)(v:A)(m:t A) := find i m = Some v.
+
+  Definition In (i:key)(m:t A) := exists e:A, MapsTo i e m.
+
+  Definition Empty m := forall (a : key)(e:A) , ~ MapsTo a e m.
+
+  Definition eq_key (p p':key*A) := E.eq (fst p) (fst p').
+
+  Definition eq_key_elt (p p':key*A) :=
+          E.eq (fst p) (fst p') /\ (snd p) = (snd p').
+
+  Definition lt_key (p p':key*A) := E.lt (fst p) (fst p').
+
+  (** Specifications in terms of [find] *)
+
+  Lemma mem_find :
+    forall m x, mem x m = match find x m with None => false | _ => true end.
+  Proof. reflexivity. Qed.
+
+  Lemma Empty_alt : forall m, Empty m <-> forall a, find a m = None.
+  Proof.
+  unfold Empty, MapsTo.
+  intuition.
+  - generalize (H a).
+    destruct (find a m); intuition.
+    elim (H0 a0); auto.
+  - rewrite H in H0; discriminate.
+  Qed.
+
+  Lemma Empty_None : forall m, Empty m <-> m = None.
+  Proof.
+  intros m. rewrite Empty_alt. split.
+  - apply extensionality_empty.
+  - intros ->. reflexivity.
+  Qed.
+
+  Lemma is_empty_None : forall m, is_empty m = true <-> m = None.
+  Proof. destruct m; simpl; intuition discriminate. Qed.
+
+  Theorem gempty: forall (i: key), find i empty = None.
+  Proof. reflexivity. Qed.
+
+  Theorem gss: forall (i: key) (x: A) (m: t A), find i (add i x m) = Some x.
+  Proof. intros; apply get_set_same. Qed.
+
+  Theorem gso: forall (i j: key) (x: A) (m: t A),
+    i <> j -> find i (add j x m) = find i m.
+  Proof. intros; apply get_set_diff; auto. Qed.
+
+  Theorem grs: forall (i: key) (m: t A), find i (remove i m) = None.
+  Proof. intros; apply get_remove_same. Qed.
+
+  Theorem gro: forall (i j: key) (m: t A),
+    i <> j -> find i (remove j m) = find i m.
+  Proof. intros; apply get_remove_diff; auto. Qed.
+
+  (** [elements] *)
+
+  Lemma xelements_Node l o r i acc :
+    xelements (Node l o r) i acc =
+    xelements l (xO i)
+      (match o with
+       | Some e => (rev i, e) :: xelements r (xI i) acc
+       | None => xelements r (xI i) acc
+       end).
+  Proof. case l, o, r; reflexivity. Qed.
+
+  Local Abbreviation InL := (InA eq_key_elt).
+
+  Lemma xelements_spec: forall m j acc k e,
+    InL (k,e) (xelements m j acc) <->
+    InL (k,e) acc \/ exists x, k=(j@x) /\ find x m = Some e.
+  Proof.
+    unfold find.
+    induction m as [|l IHl o r IHr _] using trie_ind; simpl.
+    - intros. split; intro H.
+      + now left.
+      + destruct H as [H|[x [_ H]]]. assumption.
+        discriminate H.
+    - intros j acc k e. rewrite xelements_Node. case o as [e'|];
+      rewrite IHl, ?InA_cons, IHr; clear IHl IHr; split.
+      + intros [[H|[H|H]]|H]; auto.
+        * change (E.eq k (rev j) /\ e = e') in H. destruct H as (->,<-).
+          right. exists xH. now rewrite get_Node.
+        * destruct H as (x,(->,H)). right. exists (xI x). now rewrite get_Node.
+        * destruct H as (x,(->,H)). right. exists (xO x). now rewrite get_Node.
+      + intros [H|H]; auto.
+        destruct H as (x,(->,H)). rewrite get_Node in H.
+        destruct x; simpl in *.
+        * left. right. right. now exists x.
+        * right. now exists x.
+        * left. left. injection H as ->. split; reflexivity.
+      + intros [[H|H]|H]; auto.
+        * destruct H as (x,(->,H)). right. exists (xI x). now rewrite get_Node.
+        * destruct H as (x,(->,H)). right. exists (xO x). now rewrite get_Node.
+      + intros [H|H]; auto.
+        destruct H as (x,(->,H)). rewrite get_Node in H.
+        destruct x; simpl in *.
+        * left. right. now exists x.
+        * right. now exists x.
+        * discriminate.
+  Qed.
+
+  Lemma lt_rev_append: forall j x y, E.lt x y -> E.lt (j@x) (j@y).
+  Proof. induction j; intros; simpl; auto. Qed.
+
+  Lemma xelements_sort m j acc :
+    sort lt_key acc ->
+    (forall x p, In x m -> InL p acc -> E.lt (j@x) (fst p)) ->
+    sort lt_key (xelements m j acc).
+  Proof.
+    revert j acc.
+    induction m as [|l IHl o r IHr _] using trie_ind; simpl; trivial.
+    intros j acc Hacc Hsacc. rewrite xelements_Node. destruct o as [e|].
+    - apply IHl;[constructor;[apply IHr; [apply Hacc|]|]|].
+      + intros x p Hx Hp. apply Hsacc; trivial.
+        destruct Hx as (v,Hv). exists v. unfold MapsTo, find in *. now rewrite get_Node.
+      + case_eq (xelements r (xI j) acc); [constructor|].
+        intros (z,e') q H. constructor.
+        assert (H': InL (z,e') (xelements r (xI j) acc)).
+        { rewrite H. now constructor. }
+        clear H q. rewrite xelements_spec in H'.
+        destruct H' as [H'|H'].
+        * apply (Hsacc xH (z,e')); trivial. exists e.
+          unfold MapsTo, find. now rewrite get_Node.
+        * destruct H' as (x,(->,H)).
+          red. simpl. now apply lt_rev_append.
+      + intros x (y,e') Hx Hy. inversion_clear Hy.
+        { destruct H as (H,_). simpl in H. unfold E.eq in H. rewrite H.
+          simpl. now apply lt_rev_append. }
+        rewrite xelements_spec in H.
+        destruct H as [H|H].
+        * apply Hsacc; trivial.
+          destruct Hx as (v,Hv). exists v. unfold MapsTo, find in *. now rewrite get_Node.
+        * destruct H as (z,(->,H)). simpl.
+          now apply lt_rev_append.
+    - apply IHl; [apply IHr; [apply Hacc|]|].
+      + intros x p Hx Hp. apply Hsacc; trivial.
+        destruct Hx as (v,Hv). exists v. unfold MapsTo, find in *. now rewrite get_Node.
+      + intros x (y,e') Hx H. rewrite xelements_spec in H.
+        destruct H as [H|H].
+        * apply Hsacc; trivial.
+          destruct Hx as (v,Hv). exists v. unfold MapsTo, find in *. now rewrite get_Node.
+        * destruct H as (z,(->,H)). simpl.
+          now apply lt_rev_append.
+  Qed.
+
+  Lemma elements_spec m k e :
+    InA eq_key_elt (k,e) (elements m) <-> MapsTo k e m.
+  Proof.
+   unfold elements, MapsTo. rewrite xelements_spec.
+   split; [ intros [H|(y & H & H')] | intros IN ].
+   - inversion H.
+   - simpl in *. now subst.
+   - right. now exists k.
+  Qed.
+
+  Lemma is_empty_Node l o r : isBranch l o r -> is_empty (Node l o r) = false.
+  Proof. case l, o, r; simpl; tauto. Qed.
+
+  Lemma xelements_nil m p acc :
+    xelements m p acc = nil <-> is_empty m = true /\ acc = nil.
+  Proof.
+  revert p acc.
+  induction m as [|l IHl o r IHr B] using trie_ind; simpl; intros; try easy.
+  rewrite xelements_Node, is_empty_Node by trivial.
+  rewrite IHl. destruct o; [easy|]. rewrite IHr.
+  destruct l, r; simpl in *; intuition easy.
+  Qed.
+
+  Lemma elements_nil m : elements m = nil <-> is_empty m = true.
+  Proof.
+  unfold elements. now rewrite xelements_nil.
+  Qed.
+
+  Definition fstmap (f:key->key) '(k, e) : key*A := (f k, e).
+
+  Lemma xelements_alt m j l :
+   xelements m j l = List.map (fstmap (rev_append j)) (elements m) ++ l.
+  Proof.
+  revert j l.
+  induction m as [|l IHl o r IHr _] using trie_ind; simpl; intros; auto.
+  unfold elements. rewrite !xelements_Node.
+  destruct o; simpl;
+   rewrite !IHl, !IHr, ?map_app, ?map_map, <- ?app_assoc, ?app_nil_r; simpl;
+   repeat match goal with
+          | |- context [List.map ?g (List.map ?f ?l)] => rewrite (map_map f g l)
+          | |- List.map _ _ = List.map _ _ => apply map_ext; now intros (?,?)
+          | _ => progress f_equal
+          end.
+  Qed.
+
+  Lemma elements_node r l o :
+   elements (Node l o r) =
+   (List.map (fstmap xO) (elements l)) ++
+   (match o with Some e => (xH,e)::nil | None => nil end) ++
+   (List.map (fstmap xI) (elements r)).
+  Proof.
+  unfold elements at 1. rewrite xelements_Node.
+  rewrite !xelements_alt, !app_nil_r.
+  destruct o; reflexivity.
+  Qed.
+
+  (** [cardinal] *)
+
+  Lemma cardinal_Node l o r :
+    cardinal (Node l o r) =
+    (cardinal l + (match o with Some _ => 1 | None => 0 end) + cardinal r)%nat.
+  Proof. case l, o, r; reflexivity. Qed.
+
+  Lemma xelements_length m j acc :
+    length (xelements m j acc) = (cardinal m + length acc)%nat.
+  Proof.
+   revert j acc.
+   induction m as [|l IHl o r IHr _] using trie_ind; simpl; trivial; intros.
+   rewrite xelements_Node, cardinal_Node.
+   destruct o; simpl; rewrite IHl; simpl; rewrite IHr;
+    now rewrite ?Nat.add_succ_r, ?Nat.add_0_r, Nat.add_assoc.
+  Qed.
+
+  (** Specifications in the form of [FMapInterface] *)
+
+  Section FMapSpec.
+
+  Lemma mem_1 : forall m x, In x m -> mem x m = true.
+  Proof.
+  unfold In, MapsTo; intros m x; rewrite mem_find.
+  destruct 1 as (e0,H0); rewrite H0; auto.
+  Qed.
+
+  Lemma mem_2 : forall m x, mem x m = true -> In x m.
+  Proof.
+  unfold In, MapsTo; intros m x; rewrite mem_find.
+  destruct (find x m).
+  - exists a; auto.
+  - intros; discriminate.
+  Qed.
+
+  Variable  m m' m'' : t A.
+  Variable x y z : key.
+  Variable e e' : A.
+
+  Lemma MapsTo_1 : E.eq x y -> MapsTo x e m -> MapsTo y e m.
+  Proof. intros; rewrite <- H; auto. Qed.
+
+  Lemma find_1 : MapsTo x e m -> find x m = Some e.
+  Proof. unfold MapsTo; auto. Qed.
+
+  Lemma find_2 : find x m = Some e -> MapsTo x e m.
+  Proof. red; auto. Qed.
+
+  Lemma empty_1 : Empty empty.
+  Proof.
+  rewrite Empty_alt; apply gempty.
+  Qed.
+
+  Lemma is_empty_1 : Empty m -> is_empty m = true.
+  Proof.
+  rewrite Empty_None. intros ->. reflexivity.
+  Qed.
+
+  Lemma is_empty_2 : is_empty m = true -> Empty m.
+  Proof.
+  rewrite Empty_None. destruct m; [discriminate|reflexivity].
+  Qed.
+
+  Lemma add_1 : E.eq x y -> MapsTo y e (add x e m).
+  Proof.
+  unfold MapsTo.
+  intro H; rewrite H; clear H.
+  apply gss.
+  Qed.
+
+  Lemma add_2 : ~ E.eq x y -> MapsTo y e m -> MapsTo y e (add x e' m).
+  Proof.
+  unfold MapsTo.
+  intros; rewrite gso; auto.
+  Qed.
+
+  Lemma add_3 : ~ E.eq x y -> MapsTo y e (add x e' m) -> MapsTo y e m.
+  Proof.
+  unfold MapsTo.
+  intro H; rewrite gso; auto.
+  Qed.
+
+  Lemma remove_1 : E.eq x y -> ~ In y (remove x m).
+  Proof.
+  intros; intro.
+  generalize (mem_1 H0).
+  rewrite mem_find.
+  red in H.
+  rewrite H.
+  rewrite grs.
+  intros; discriminate.
+  Qed.
+
+  Lemma remove_2 : ~ E.eq x y -> MapsTo y e m -> MapsTo y e (remove x m).
+  Proof.
+  unfold MapsTo.
+  intro H; rewrite gro; auto.
+  Qed.
+
+  Lemma remove_3 : MapsTo y e (remove x m) -> MapsTo y e m.
+  Proof.
+  unfold MapsTo.
+  destruct (E.eq_dec x y).
+  - subst.
+    rewrite grs; intros; discriminate.
+  - rewrite gro; auto.
+  Qed.
+
+  Lemma elements_1 :
+     MapsTo x e m -> InA eq_key_elt (x,e) (elements m).
+  Proof. apply elements_spec. Qed.
+
+  Lemma elements_2 :
+     InA eq_key_elt (x,e) (elements m) -> MapsTo x e m.
+  Proof. apply elements_spec. Qed.
+
+  Lemma elements_3 : sort lt_key (elements m).
+  Proof.
+    unfold elements.
+    apply xelements_sort. constructor. inversion 2.
+  Qed.
+
+  Lemma elements_3w : NoDupA eq_key (elements m).
+  Proof.
+    apply ME.Sort_NoDupA.
+    apply elements_3.
+  Qed.
+
+  Lemma cardinal_1 : cardinal m = length (elements m).
+  Proof.
+   unfold elements. rewrite xelements_length. simpl.
+   symmetry. apply Nat.add_0_r.
+  Qed.
+
+  End FMapSpec.
+
+  (** [map] and [mapi] *)
+
+  Variable B : Type.
+
+  Section Mapi.
+
+    Variable f : key -> A -> B.
+
+    Fixpoint xmapi' (m : branch A) (i : positive) {struct m} : t B :=
+      branch_map (fun l o r =>
+        Node (option_bind (fun l => xmapi' l (xO i)) l)
+             (option_map (f (rev i)) o)
+             (option_bind (fun r => xmapi' r (xI i)) r)) m.
+
+    Definition xmapi (m : t A) (i : positive) : t B :=
+      match m with Some m => xmapi' m i | None => None end.
+
+    Lemma xmapi_Node l o r i :
+      xmapi (Node l o r) i =
+      Node (xmapi l (xO i)) (option_map (f (rev i)) o) (xmapi r (xI i)).
+    Proof. case l, o, r; reflexivity. Qed.
+
+    Definition mapi m := xmapi m xH.
+
+  End Mapi.
+
+  Definition map (f : A -> B) : t A -> t B := map_filter (fun a => Some (f a)).
+
+  End A.
+
+  Lemma xgmapi:
+    forall (A B: Type) (f: key -> A -> B) (i j : key) (m: t A),
+      find i (xmapi f m j) = option_map (f (j@i)) (find i m).
+  Proof.
+  unfold find.
+  induction i; intros; induction m using trie_ind;
+   rewrite ?xmapi_Node, ?get_Node, ?IHi; simpl; auto.
+  Qed.
+
+  Theorem gmapi:
+    forall (A B: Type) (f: key -> A -> B) (i: key) (m: t A),
+    find i (mapi f m) = option_map (f i) (find i m).
+  Proof. intros. apply xgmapi. Qed.
+
+  Theorem gmap:
+    forall (A B: Type) (f: A -> B) (i: key) (m: t A),
+    find i (map f m) = option_map f (find i m).
+  Proof.
+  intros. unfold map, find. rewrite get_map_filter. now destruct get.
+  Qed.
+
+  Lemma map_as_mapi A B (f:A -> B)(m : t A) : map f m = mapi (fun _ => f) m.
+  Proof.
+  apply extensionality. intros i.
+  change (find i (map f m) = find i (mapi (fun _ => f) m)).
+  now rewrite gmap, gmapi.
+  Qed.
+
+  Lemma mapi_1 :
+    forall (elt elt':Type)(m: t elt)(x:key)(e:elt)(f:key->elt->elt'),
+    MapsTo x e m ->
+    exists y, E.eq y x /\ MapsTo x (f y e) (mapi f m).
+  Proof.
+  intros.
+  exists x.
+  split; [red; auto|].
+  apply find_2.
+  generalize (find_1 H); clear H; intros.
+  rewrite gmapi.
+  rewrite H.
+  simpl; auto.
+  Qed.
+
+  Lemma mapi_2 :
+    forall (elt elt':Type)(m: t elt)(x:key)(f:key->elt->elt'),
+    In x (mapi f m) -> In x m.
+  Proof.
+  intros.
+  apply mem_2.
+  rewrite mem_find.
+  destruct H as (v,H).
+  generalize (find_1 H); clear H; intros.
+  rewrite gmapi in H.
+  destruct (find x m); auto.
+  simpl in *; discriminate.
+  Qed.
+
+  Lemma map_1 : forall (elt elt':Type)(m: t elt)(x:key)(e:elt)(f:elt->elt'),
+    MapsTo x e m -> MapsTo x (f e) (map f m).
+  Proof.
+  intros; rewrite map_as_mapi.
+  destruct (mapi_1 (fun _ => f) H); intuition.
+  Qed.
+
+  Lemma map_2 : forall (elt elt':Type)(m: t elt)(x:key)(f:elt->elt'),
+    In x (map f m) -> In x m.
+  Proof.
+  intros; rewrite map_as_mapi in *; eapply mapi_2; eauto.
+  Qed.
+
+  (** [map2] *)
+
+  Definition map2 (elt elt' elt'':Type)(f:option elt->option elt'->option elt'') :=
+   combine (fun o1 o2 => match o1,o2 with None,None => None | _, _ => f o1 o2 end).
+
+  Lemma gmap2: forall (elt elt' elt'':Type)(f:option elt->option elt'->option elt'')
+    (i: key)(m1:t elt)(m2: t elt'),
+    find i (map2 f m1 m2) =
+    match find i m1, find i m2 with None,None => None | o1, o2 => f o1 o2 end.
+  Proof.
+  intros. unfold map2, find. rewrite get_combine by reflexivity.
+  destruct (get i m1), (get i m2); reflexivity.
+  Qed.
+
+  Lemma map2_1 : forall (elt elt' elt'':Type)(m: t elt)(m': t elt')
+    (x:key)(f:option elt->option elt'->option elt''),
+    In x m \/ In x m' ->
+    find x (map2 f m m') = f (find x m) (find x m').
+  Proof.
+  intros.
+  rewrite gmap2.
+  generalize (@mem_1 _ m x) (@mem_1 _ m' x).
+  do 2 rewrite mem_find.
+  destruct (find x m); simpl; auto.
+  destruct (find x m'); simpl; auto.
+  intros.
+  destruct H; intuition; try discriminate.
+  Qed.
+
+  Lemma  map2_2 : forall (elt elt' elt'':Type)(m: t elt)(m': t elt')
+    (x:key)(f:option elt->option elt'->option elt''),
+    In x (map2 f m m') -> In x m \/ In x m'.
+  Proof.
+  intros.
+  generalize (mem_1 H); clear H; intros.
+  rewrite mem_find in H.
+  rewrite gmap2 in H.
+  generalize (@mem_2 _ m x) (@mem_2 _ m' x).
+  do 2 rewrite mem_find.
+  destruct (find x m); simpl in *; auto.
+  destruct (find x m'); simpl in *; auto.
+  Qed.
+
+  (** [fold] *)
+
+  Section Fold.
+
+    Variables A B : Type.
+    Variable f : key -> A -> B -> B.
+
+    Fixpoint xfold' (m : branch A) (v : B) (i : key) {struct m} : B :=
+      branch_map (fun l o r =>
+        let v := match l with Some l => xfold' l v (xO i) | None => v end in
+        let v := match o with Some x => f (rev i) x v | None => v end in
+        match r with Some r => xfold' r v (xI i) | None => v end) m.
+
+    Definition xfold (m : t A) (v : B) (i : key) : B :=
+      match m with Some m => xfold' m v i | None => v end.
+
+    Definition fold m i := xfold m i xH.
+
+    Lemma xfold_Node l o r v i :
+      xfold (Node l o r) v i =
+      match o with
+      | Some x => xfold r (f (rev i) x (xfold l v (xO i))) (xI i)
+      | None => xfold r (xfold l v (xO i)) (xI i)
+      end.
+    Proof. case l, o, r; reflexivity. Qed.
+
+  End Fold.
+
+  Lemma fold_1 :
+    forall (A:Type)(m:t A)(B:Type)(i : B) (f : key -> A -> B -> B),
+    fold f m i = fold_left (fun a p => f (fst p) (snd p) a) (elements m) i.
+  Proof.
+    unfold fold, elements. intros A m B i f. revert m i.
+    set (f' := fun a p => f (fst p) (snd p) a).
+    assert (H: forall m i j acc,
+      fold_left f' acc (xfold f m i j) =
+      fold_left f' (xelements m j acc) i).
+    { induction m as [|l IHl o r IHr _] using trie_ind; intros; trivial.
+      rewrite xfold_Node, xelements_Node.
+      destruct o; simpl; now rewrite IHr, <- IHl. }
+    intros. exact (H m i xH nil).
+  Qed.
+
+  (** [equal]: thanks to extensionality, two tries are [equal] when the trie
+      of their differences is empty. *)
+
+  Definition equal_opt (A:Type)(cmp : A -> A -> bool) o1 o2 : option unit :=
+    match o1, o2 with
+    | None, None => None
+    | Some v1, Some v2 => if cmp v1 v2 then None else Some tt
+    | _, _ => Some tt
+    end.
+
+  Definition equal (A:Type)(cmp : A -> A -> bool)(m1 m2 : t A) : bool :=
+    is_empty (combine (equal_opt cmp) m1 m2).
+
+  Definition Equal (A:Type)(m m':t A) :=
+    forall y, find y m = find y m'.
+  Definition Equiv (A:Type)(eq_elt:A->A->Prop) m m' :=
+    (forall k, In k m <-> In k m') /\
+    (forall k e e', MapsTo k e m -> MapsTo k e' m' -> eq_elt e e').
+  Definition Equivb (A:Type)(cmp: A->A->bool) := Equiv (Cmp cmp).
+
+  Lemma equal_spec : forall (A:Type)(m m':t A)(cmp:A->A->bool),
+    equal cmp m m' = true <-> Equivb cmp m m'.
+  Proof.
+  intros A m m' cmp. unfold equal, Equivb, Equiv, In, MapsTo, Cmp, find.
+  rewrite is_empty_None, <- Empty_None, Empty_alt. unfold find.
+  setoid_rewrite get_combine; [|reflexivity].
+  split.
+  - intros H. split.
+    + intros k. specialize (H k). unfold equal_opt in H.
+      destruct (get k m), (get k m'); split; try discriminate;
+        intros (v,Hv); try discriminate; eauto.
+    + intros k e e' He He'. specialize (H k). rewrite He, He' in H.
+      simpl in H. now destruct cmp.
+  - intros (H1,H2) k. specialize (H1 k). specialize (H2 k).
+    unfold equal_opt.
+    destruct (get k m) as [v|], (get k m') as [v'|]; trivial.
+    + now rewrite (H2 v v').
+    + exfalso. destruct H1 as (H1,_). destruct H1 as (?,H1); eauto. discriminate.
+    + exfalso. destruct H1 as (_,H1). destruct H1 as (?,H1); eauto. discriminate.
+  Qed.
+
+  Lemma equal_1 : forall (A:Type)(m m':t A)(cmp:A->A->bool),
+    Equivb cmp m m' -> equal cmp m m' = true.
+  Proof. intros; now apply equal_spec. Qed.
+
+  Lemma equal_2 : forall (A:Type)(m m':t A)(cmp:A->A->bool),
+    equal cmp m m' = true -> Equivb cmp m m'.
+  Proof. intros; now apply equal_spec. Qed.
+
 End FMap.
+
+(** Here come some additional facts about this implementation.
+  Most are facts that cannot be derivable from the general interface. *)
+
+Module FMapAdditionalFacts.
+  Import FMap.
+
+  (** The main point of this implementation: [Equal] maps are
+      Leibniz-equal. *)
+
+  Lemma Equal_eq {A} (m m' : t A) : Equal m m' <-> m = m'.
+  Proof.
+  split.
+  - apply extensionality.
+  - intros <- k. reflexivity.
+  Qed.
+
+  Lemma Equiv_eq {A} (m m' : t A) :
+    Equiv Logic.eq m m' <-> m = m'.
+  Proof.
+  rewrite <- Equal_eq. unfold Equiv, In, MapsTo, Equal, find.
+  split.
+  - intros (H1,H2) k. specialize (H1 k). specialize (H2 k).
+    destruct (get k m) as [v|], (get k m') as [v'|]; trivial.
+    + f_equal. now apply H2.
+    + exfalso. destruct H1 as (H1,_). destruct H1 as (?,H1); eauto. discriminate.
+    + exfalso. destruct H1 as (_,H1). destruct H1 as (?,H1); eauto. discriminate.
+  - intros H. split.
+    + intros k. now rewrite H.
+    + intros k e e' He He'. rewrite H in He. congruence.
+  Qed.
+
+  (* Derivable from the Map interface *)
+  Theorem gsspec {A} i j x (m: t A) :
+    find i (add j x m) = if E.eq_dec i j then Some x else find i m.
+  Proof.
+    destruct (E.eq_dec i j) as [->|];
+    [ apply gss | apply gso; auto ].
+  Qed.
+
+  (* Not derivable from the Map interface, but easy from extensionality *)
+  Theorem gsident {A} i (m:t A) v :
+    find i m = Some v -> add i v m = m.
+  Proof.
+    intros H. apply extensionality. intros k.
+    change (find k (add i v m) = find k m).
+    rewrite gsspec. destruct E.eq_dec; congruence.
+  Qed.
+
+  Theorem remove_absent {A} i (m:t A) :
+    find i m = None -> remove i m = m.
+  Proof.
+    intros H. apply extensionality. intros k.
+    change (find k (remove i m) = find k m).
+    destruct (E.eq_dec k i) as [->|].
+    - now rewrite grs.
+    - apply gro; auto.
+  Qed.
+
+  Theorem map2_commut{A B C}
+    (f: option A -> option B -> option C)
+    (g: option B -> option A -> option C) :
+    (forall o1 o2, f o1 o2 = g o2 o1) ->
+    forall m1 m2, map2 f m1 m2 = map2 g m2 m1.
+  Proof.
+    intros E m1 m2. apply extensionality. intros k.
+    change (find k (map2 f m1 m2) = find k (map2 g m2 m1)).
+    rewrite !gmap2.
+    destruct (find k m1), (find k m2); simpl; auto.
+  Qed.
+
+End FMapAdditionalFacts.
