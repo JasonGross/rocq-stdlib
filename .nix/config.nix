@@ -273,8 +273,9 @@ with builtins; with (import <nixpkgs> {}).lib; {
       rocq-core.override.version = "master";
       coq.override.version = "master";
       stdlib-test.job = true;
-      rocq-elpi.override.version = "master";
-      rocq-elpi-test.override.version = "master";
+      # CI overlay for #170: rocq-elpi master + JasonGross/coq-elpi#fable/vector-derived-names
+      rocq-elpi.override.version = "JasonGross:fable/vector-derived-names";
+      rocq-elpi-test.override.version = "JasonGross:fable/vector-derived-names";
       hierarchy-builder.override.version = "master";
       micromega-plugin.override.version = "master";
       micromega-plugin.job = false;
@@ -284,14 +285,18 @@ with builtins; with (import <nixpkgs> {}).lib; {
       mathcomp-real-closed.override.version = "master";
       stdlib-all.job = true;  # check that theories/All.v is up to date
       mathcomp-algebra-tactics.job = false;  # no longer in Rocq CI since Rocq 9.3
+      # CI overlay for #170: Equations master + JasonGross/Coq-Equations#fable/abbrev-pattern-vars
+      equations.override.version = "JasonGross:fable/abbrev-pattern-vars";
+      equations-test.override.version = "JasonGross:fable/abbrev-pattern-vars";
     }; };
     "rocq-9.3" = { rocqPackages = common-bundles // {
       rocq-core.override.version = "9.3";
       coq.override.version = "9.3";
       # check that we compile without warnings on last release of Rocq
       stdlib-warnings.job = true;
-      rocq-elpi.override.version = "master";
-      rocq-elpi-test.override.version = "master";
+      # CI overlay for #170: rocq-elpi master + JasonGross/coq-elpi#fable/vector-derived-names
+      rocq-elpi.override.version = "JasonGross:fable/vector-derived-names";
+      rocq-elpi-test.override.version = "JasonGross:fable/vector-derived-names";
       # plugin pins, from v9.3 branch of Rocq
       aac-tactics.override.version = "09523f9910891dcc2072f2b87fee658a62feb484";
       atbr.override.version = "1806f95dd68b953312cbee44224ea1e96de9f35f";
