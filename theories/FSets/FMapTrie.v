@@ -33,17 +33,6 @@ Module TrieMap <: S with Module E := PositiveOrderedTypeBits.
 
   Definition key := positive : Type.
 
-  (** Reverses the positive [y] and concatenate it with [x] *)
-
-  Fixpoint rev_append (y x : positive) : positive :=
-    match y with
-    | xH => x
-    | xI y => rev_append y (xI x)
-    | xO y => rev_append y (xO x)
-    end.
-  Local Infix "@" := rev_append (at level 60).
-  Definition rev x := x@xH.
-
   Definition t := trie.
 
   Section A.
@@ -131,99 +120,27 @@ Module TrieMap <: S with Module E := PositiveOrderedTypeBits.
 
   (** Specification of [elements] *)
 
-  Definition fstmap (f:key->key) '(k, e) : key*A := (f k, e).
-
   Lemma elements_node r l o :
    elements (Node l o r) =
    (List.map (fstmap xO) (elements l)) ++
    (match o with Some e => (xH,e)::nil | None => nil end) ++
    (List.map (fstmap xI) (elements r)).
-  Proof. case l, o, r; reflexivity. Qed.
+  Proof. apply to_list_Node. Qed.
 
-  Local Abbreviation InL := (InA eq_key_elt).
-
-  Lemma InL_fstmap f k e l :
-    InL (k,e) (List.map (fstmap f) l) <-> exists k', k = f k' /\ InL (k',e) l.
+  Local Lemma InA_eq_key_elt (p : key*A) l : InA eq_key_elt p l <-> List.In p l.
   Proof.
-    induction l as [|(k0,e0) l IH]; simpl.
-    - rewrite InA_nil. split; [intros []|intros (k' & _ & H); inversion H].
-    - split.
-      + intros H. apply InA_cons in H. destruct H as [(Hk,He)|H]; simpl in *.
-        * exists k0. split; [exact Hk|]. left. split; simpl; [reflexivity|exact He].
-        * apply IH in H. destruct H as (k' & -> & H). exists k'. split; trivial. now right.
-      + intros (k' & -> & H). apply InA_cons in H. destruct H as [(Hk,He)|H]; simpl in *.
-        * unfold E.eq in Hk. subst. left. split; reflexivity.
-        * right. apply IH. exists k'. auto.
-  Qed.
-
-  Lemma InL_opt k e (o : option A) :
-    InL (k,e) (match o with Some v => (xH,v)::nil | None => nil end)
-    <-> k = xH /\ o = Some e.
-  Proof.
-    destruct o as [v|]; rewrite ?InA_cons, InA_nil; split.
-    - intros [(Hk,He)|[]]. simpl in *. subst. auto.
-    - intros (-> & [= ->]). left. split; reflexivity.
-    - intros [].
-    - intros (_ & [=]).
+    rewrite InA_alt. split.
+    - intros ((k,x) & (Hk,Hx) & ?). destruct p; simpl in *. unfold E.eq in Hk. now subst.
+    - intros ?. exists p. split; [|trivial]. destruct p; split; reflexivity.
   Qed.
 
   Lemma elements_spec m k e :
     InA eq_key_elt (k,e) (elements m) <-> MapsTo k e m.
-  Proof.
-    unfold MapsTo, find. revert k.
-    induction m as [|l IHl o r IHr _] using trie_ind; intros k.
-    - split; [inversion 1 | discriminate].
-    - rewrite elements_node, !InA_app_iff, !InL_fstmap, InL_opt, get_Node.
-      setoid_rewrite IHl. setoid_rewrite IHr.
-      destruct k as [k|k|]; split.
-      + intros [(k0 & H & _)|[(H & _)|(k0 & H & H')]]; try discriminate.
-        injection H as <-. exact H'.
-      + intros H. right. right. exists k. auto.
-      + intros [(k0 & H & H')|[(H & _)|(k0 & H & _)]]; try discriminate.
-        injection H as <-. exact H'.
-      + intros H. left. exists k. auto.
-      + intros [(k0 & H & _)|[(_ & H)|(k0 & H & _)]]; try discriminate. exact H.
-      + intros H. right. left. auto.
-  Qed.
-
-  Lemma sort_app (l1 l2 : list (key*A)) :
-    sort lt_key l1 -> sort lt_key l2 ->
-    (forall x y, List.In x l1 -> List.In y l2 -> lt_key x y) ->
-    sort lt_key (l1 ++ l2).
-  Proof.
-    induction 1 as [|x l1 Hs IH Hinf]; simpl; intros Hs2 Hlt; trivial.
-    constructor; [apply IH; trivial; intros; apply Hlt; simpl; auto|].
-    destruct Hinf as [|y l1' H]; simpl.
-    - destruct l2; constructor. apply Hlt; simpl; auto.
-    - constructor; trivial.
-  Qed.
-
-  Lemma sort_fstmap f l :
-    (forall x y, E.lt x y -> E.lt (f x) (f y)) ->
-    sort lt_key l -> sort lt_key (List.map (fstmap f) l).
-  Proof.
-    intros Hf. induction 1 as [|(k,e) l Hs IH Hinf]; simpl; constructor; trivial.
-    destruct Hinf as [|(k',e') l' H]; simpl; constructor.
-    unfold lt_key in *; simpl in *; auto.
-  Qed.
+  Proof. rewrite InA_eq_key_elt. apply In_to_list. Qed.
 
   Lemma elements_sort m : sort lt_key (elements m).
   Proof.
-    induction m as [|l IHl o r IHr _] using trie_ind; [constructor|].
-    rewrite elements_node.
-    apply sort_app; [apply sort_fstmap; trivial| apply sort_app |].
-    - destruct o; repeat constructor.
-    - apply sort_fstmap; trivial.
-    - intros (x,d) (y,d') Hx Hy.
-      destruct o; simpl in Hx; [destruct Hx as [[= <- <-]|[]]|destruct Hx].
-      rewrite in_map_iff in Hy. destruct Hy as ((k,e) & [= <- <-] & _).
-      red; simpl; exact I.
-    - intros (x,d) (y,d') Hx Hy.
-      rewrite in_map_iff in Hx. destruct Hx as ((k,e) & [= <- <-] & _).
-      rewrite in_app_iff, in_map_iff in Hy.
-      destruct Hy as [Hy|((k',e') & [= <- <-] & _)];
-        [destruct o; simpl in Hy; [destruct Hy as [[= <- <-]|[]]|destruct Hy]|];
-        red; simpl; exact I.
+    unfold elements, lt_key. apply (Sorted_to_list E.lt); unfold E.lt; intros; simpl; auto.
   Qed.
 
   (** [cardinal] *)
@@ -357,45 +274,16 @@ Module TrieMap <: S with Module E := PositiveOrderedTypeBits.
 
   Variable B : Type.
 
-  Section Mapi.
-
-    Variable f : key -> A -> B.
-
-    Fixpoint xmapi' (m : branch A) (i : positive) {struct m} : t B :=
-      branch_map (fun l o r =>
-        Node (option_bind (fun l => xmapi' l (xO i)) l)
-             (option_map (f (rev i)) o)
-             (option_bind (fun r => xmapi' r (xI i)) r)) m.
-
-    Definition xmapi (m : t A) (i : positive) : t B :=
-      match m with Some m => xmapi' m i | None => None end.
-
-    Lemma xmapi_Node l o r i :
-      xmapi (Node l o r) i =
-      Node (xmapi l (xO i)) (option_map (f (rev i)) o) (xmapi r (xI i)).
-    Proof. case l, o, r; reflexivity. Qed.
-
-    Definition mapi m := xmapi m xH.
-
-  End Mapi.
+  Definition mapi (f : key -> A -> B) m := mapi_filter (fun k a => Some (f k a)) m.
 
   Definition map (f : A -> B) : t A -> t B := map_filter (fun a => Some (f a)).
 
   End A.
 
-  Lemma xgmapi:
-    forall (A B: Type) (f: key -> A -> B) (i j : key) (m: t A),
-      find i (xmapi f m j) = option_map (f (j@i)) (find i m).
-  Proof.
-  unfold find.
-  induction i; intros; induction m using trie_ind;
-   rewrite ?xmapi_Node, ?get_Node, ?IHi; simpl; auto.
-  Qed.
-
   Theorem gmapi:
     forall (A B: Type) (f: key -> A -> B) (i: key) (m: t A),
     find i (mapi f m) = option_map (f i) (find i m).
-  Proof. intros. apply xgmapi. Qed.
+  Proof. intros. unfold find, mapi. rewrite get_mapi_filter. now destruct get. Qed.
 
   Theorem gmap:
     forall (A B: Type) (f: A -> B) (i: key) (m: t A),
@@ -503,46 +391,14 @@ Module TrieMap <: S with Module E := PositiveOrderedTypeBits.
     Variables A B : Type.
     Variable f : key -> A -> B -> B.
 
-    Fixpoint xfold' (m : branch A) (v : B) (i : key) {struct m} : B :=
-      branch_map (fun l o r =>
-        let v := match l with Some l => xfold' l v (xO i) | None => v end in
-        let v := match o with Some x => f (rev i) x v | None => v end in
-        match r with Some r => xfold' r v (xI i) | None => v end) m.
-
-    Definition xfold (m : t A) (v : B) (i : key) : B :=
-      match m with Some m => xfold' m v i | None => v end.
-
-    Definition fold m i := xfold m i xH.
-
-    Lemma xfold_Node l o r v i :
-      xfold (Node l o r) v i =
-      match o with
-      | Some x => xfold r (f (rev i) x (xfold l v (xO i))) (xI i)
-      | None => xfold r (xfold l v (xO i)) (xI i)
-      end.
-    Proof. case l, o, r; reflexivity. Qed.
+    Definition fold (m : t A) (i : B) : B := Trie.fold f m i.
 
   End Fold.
-
-  Lemma xfold_elements :
-    forall (A B : Type) (f : key -> A -> B -> B) m v j,
-    xfold f m v j =
-    fold_left (fun a p => f (fst p) (snd p) a) (List.map (fstmap (rev_append j)) (elements m)) v.
-  Proof.
-    intros A B f.
-    induction m as [|l IHl o r IHr _] using trie_ind; intros; trivial.
-    rewrite xfold_Node, elements_node, !map_app, !fold_left_app, !map_map.
-    destruct o; simpl; rewrite IHr, IHl;
-      repeat (f_equal; try (apply map_ext; now intros (?,?))).
-  Qed.
 
   Lemma fold_1 :
     forall (A:Type)(m:t A)(B:Type)(i : B) (f : key -> A -> B -> B),
     fold f m i = fold_left (fun a p => f (fst p) (snd p) a) (elements m) i.
-  Proof.
-    intros. unfold fold. rewrite xfold_elements.
-    erewrite map_ext with (g := fun p => p); [now rewrite map_id | now intros (k,e)].
-  Qed.
+  Proof. intros. apply fold_to_list. Qed.
 
   (** [equal]: thanks to extensionality, two tries are [equal] when the trie
       of their differences is empty. *)
