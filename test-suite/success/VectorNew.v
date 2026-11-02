@@ -1,4 +1,4 @@
-(* The new interface of Vector and Fin (vec, fin, getFin, Fin.val, ...) next
+(* The new interface of Vector and Fin (vec, fin, getFin, Fin.toNat, ...) next
    to the deprecated one. The constructors nil and cons take their type and
    length arguments explicitly, as Vector.nil and Vector.cons did; the
    notations do not care. *)
@@ -37,9 +37,9 @@ Goal get [1; 2; 3] 1 = Some 2. Proof. reflexivity. Qed.
 Goal put [1; 2; 3] 1 7 = [1; 7; 3]. Proof. reflexivity. Qed.
 Goal getFin [1; 2; 3] (Fin.finS Fin.finO) = 2. Proof. reflexivity. Qed.
 Goal putFin [1; 2; 3] Fin.finO 7 = [7; 2; 3]. Proof. reflexivity. Qed.
-Goal Fin.val (Fin.mk 5 2 ltac:(repeat constructor)) = 2.
-Proof. apply Fin.val_mk. Qed.
-Goal Fin.val (Fin.last 4) = 4. Proof. reflexivity. Qed.
+Goal Fin.toNat (Fin.mk 5 2 ltac:(repeat constructor)) = 2.
+Proof. apply Fin.toNat_mk. Qed.
+Goal Fin.toNat (Fin.last 4) = 4. Proof. reflexivity. Qed.
 Goal unapp 2 [1; 2; 3] = ([1; 2], [3]). Proof. reflexivity. Qed.
 Goal ([1; 2] ++ [3]) = [1; 2; 3]. Proof. reflexivity. Qed.
 

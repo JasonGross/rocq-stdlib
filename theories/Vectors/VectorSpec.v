@@ -228,7 +228,7 @@ Proof.
     rewrite ?cast_refl, ?cast_cons, ?IHv; auto using f_equal, cast_ext.
 Qed.
 
-Lemma nth_error_to_list [A n] (v : vec A n) i : List.nth_error v (Fin.to_nat i) = Some (getFin v i).
+Lemma nth_error_to_list [A n] (v : vec A n) i : List.nth_error v (Fin.toNat i) = Some (getFin v i).
 Proof. induction v; [case Fin.inj_0 | case (Fin.inj_S i) as [->|[? ->] ] ]; cbn; eauto. Qed.
 
 Lemma getFin_inj [A n] (v w : vec A n)
@@ -236,7 +236,7 @@ Lemma getFin_inj [A n] (v w : vec A n)
 Proof.
   apply to_list_inj, List.nth_error_ext; intros i.
   case (Nat.ltb_spec i n) as [Hi|].
-  { rewrite <-(Fin.to_nat_mk i n Hi), !nth_error_to_list; auto using f_equal. }
+  { rewrite <-(Fin.toNat_mk i n Hi), !nth_error_to_list; auto using f_equal. }
   { rewrite 2 (proj2 (List.nth_error_None _ _)); rewrite ?length_to_list; auto. }
 Qed.
 
@@ -435,8 +435,8 @@ Proof.
 intros n k1 k2 H v a H1 H2.
 unfold nth_order. rewrite nth_replace_neq; [reflexivity|].
 intros E. apply H.
-apply (f_equal (fun p => proj1_sig (Fin.to_nat_sig p))) in E.
-now rewrite !Fin.to_nat_sig_of_nat in E.
+apply (f_equal (fun p => proj1_sig (Fin.to_nat p))) in E.
+now rewrite !Fin.to_nat_of_nat in E.
 Qed.
 
 Lemma replace_id A: forall n p (v : t A n),
@@ -707,7 +707,7 @@ Proof.
 intros P n v. rewrite Forall_nth. split.
 - intros H i Hi. apply H.
 - intros H p.
-  rewrite <- (Fin.of_nat_to_nat_sig_inv p).
+  rewrite <- (Fin.of_nat_to_nat_inv p).
   apply H.
 Qed.
 
@@ -746,7 +746,7 @@ intros P n v1 v2. rewrite Forall2_nth. split.
   rewrite (nth_order_ext _ _ _ _ Hi1 Hi2).
   apply H.
 - intros H p.
-  rewrite <- (Fin.of_nat_to_nat_sig_inv p).
+  rewrite <- (Fin.of_nat_to_nat_inv p).
   apply H.
 Qed.
 

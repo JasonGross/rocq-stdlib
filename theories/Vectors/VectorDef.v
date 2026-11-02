@@ -272,6 +272,52 @@ Definition getLt {n} (v: vec A n) {p} (H: p < n) := getFin v (Fin.mk _ _ H).
 Definition putLt {n} (v: vec A n) {p} (H: p < n) := putFin v (Fin.mk _ _ H).
 End UniformElementType.
 
+(** * Boolean equality *)
+
+Section BEQ.
+
+ Variables (A: Type) (A_beq: A -> A -> bool).
+ Hypothesis A_eqb_eq: forall x y, A_beq x y = true <-> x = y.
+
+ Fixpoint eqb {m n} (v1: vec A m) (v2: vec A n) : bool :=
+   match v1, v2 with
+   | nil, nil => true
+   | cons h1 t1, cons h2 t2 => A_beq h1 h2 && eqb t1 t2
+   | _, _ => false
+   end.
+
+ Lemma eqb_nat_eq: forall m n (v1: vec A m) (v2: vec A n)
+  (Hbeq: eqb v1 v2 = true), m = n.
+ Proof.
+   intros m n v1; revert n.
+   induction v1; intros ? v2; destruct v2;
+     [now constructor | discriminate | discriminate | simpl].
+   intros Hbeq; apply andb_prop in Hbeq; destruct Hbeq.
+   f_equal; eauto.
+ Qed.
+
+ Lemma eqb_eq: forall n (v1: vec A n) (v2: vec A n),
+  eqb v1 v2 = true <-> v1 = v2.
+ Proof.
+   induction v1 as [|h1 n t1 IH]; intros v2.
+   - rewrite (inj_0 v2). split; reflexivity.
+   - rewrite (inj_S v2); cbn. split.
+     + intros Hbeq. apply andb_prop in Hbeq as [Hh Ht].
+       apply A_eqb_eq in Hh. apply IH in Ht. now f_equal.
+     + intros Heq. apply andb_true_intro. split.
+       * apply A_eqb_eq, (f_equal (@hd _ _) Heq).
+       * apply IH, (f_equal (@tl _ _) Heq).
+ Qed.
+
+ Definition eq_dec n (v1 v2: vec A n): {v1 = v2} + {v1 <> v2}.
+ Proof.
+ case_eq (eqb v1 v2); intros.
+  + left; now apply eqb_eq.
+  + right. intros Heq. apply <- eqb_eq in Heq. congruence.
+ Defined.
+
+End BEQ.
+
 (** * The historical interface, deprecated *)
 
 #[local] Set Warnings "-deprecated".

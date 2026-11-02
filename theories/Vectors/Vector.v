@@ -299,7 +299,7 @@ Proof.
     rewrite ?cast_refl, ?cast_cons, ?IHv; auto using f_equal, cast_ext.
 Qed.
 
-Lemma nth_error_to_list [A n] (v : vec A n) i : List.nth_error v (Fin.to_nat i) = Some (getFin v i).
+Lemma nth_error_to_list [A n] (v : vec A n) i : List.nth_error v (Fin.toNat i) = Some (getFin v i).
 Proof. induction v; [case Fin.inj_0 | case (Fin.inj_S i) as [->|[? ->] ] ]; cbn; eauto. Qed.
 
 Lemma getFin_inj [A n] (v w : vec A n)
@@ -307,7 +307,7 @@ Lemma getFin_inj [A n] (v w : vec A n)
 Proof.
   apply to_list_inj, List.nth_error_ext; intros i.
   case (Nat.ltb_spec i n) as [Hi|].
-  { rewrite <-(Fin.to_nat_mk i n Hi), !nth_error_to_list; auto using f_equal. }
+  { rewrite <-(Fin.toNat_mk i n Hi), !nth_error_to_list; auto using f_equal. }
   { rewrite 2 (proj2 (List.nth_error_None _ _)); rewrite ?length_to_list; auto. }
 Qed.
 
@@ -315,52 +315,6 @@ Lemma getFin_inj_iff [A n] (v w : vec A n) :
   (forall i, getFin v i = getFin w i) <-> v = w.
 Proof. split; [apply getFin_inj | intros ->; auto]. Qed.
 
-
-(** * Boolean equality *)
-
-Section BEQ.
-
- Variables (A: Type) (A_beq: A -> A -> bool).
- Hypothesis A_eqb_eq: forall x y, A_beq x y = true <-> x = y.
-
- Fixpoint eqb {m n} (v1: vec A m) (v2: vec A n) : bool :=
-   match v1, v2 with
-   | [], [] => true
-   | h1::t1, h2::t2 => A_beq h1 h2 && eqb t1 t2
-   | _, _ => false
-   end.
-
- Lemma eqb_nat_eq: forall m n (v1: vec A m) (v2: vec A n)
-  (Hbeq: eqb v1 v2 = true), m = n.
- Proof.
-   intros m n v1; revert n.
-   induction v1; intros ? v2; destruct v2;
-     [now constructor | discriminate | discriminate | simpl].
-   intros Hbeq; apply andb_prop in Hbeq; destruct Hbeq.
-   f_equal; eauto.
- Qed.
-
- Lemma eqb_eq: forall n (v1: vec A n) (v2: vec A n),
-  eqb v1 v2 = true <-> v1 = v2.
- Proof.
-   induction v1 as [|h1 n t1 IH]; intros v2.
-   - rewrite (inj_0 v2). split; reflexivity.
-   - rewrite (inj_S v2); cbn. split.
-     + intros Hbeq. apply andb_prop in Hbeq as [Hh Ht].
-       apply A_eqb_eq in Hh. apply IH in Ht. now f_equal.
-     + intros Heq. apply andb_true_intro. split.
-       * apply A_eqb_eq, (f_equal (@hd _ _) Heq).
-       * apply IH, (f_equal (@tl _ _) Heq).
- Qed.
-
- Definition eq_dec n (v1 v2: vec A n): {v1 = v2} + {v1 <> v2}.
- Proof.
- case_eq (eqb v1 v2); intros.
-  + left; now apply eqb_eq.
-  + right. intros Heq. apply <- eqb_eq in Heq. congruence.
- Defined.
-
-End BEQ.
 
 (** * The historical interface, deprecated *)
 
@@ -383,6 +337,162 @@ Abbreviation to_list_const := to_list_repeat (only parsing).
 #[deprecated(since="9.3", use=to_list_app)]
 Abbreviation to_list_append := to_list_app (only parsing).
 
+(** The historical lemmas live in the deprecated file [VectorSpec]; they are
+    reachable here under their old names, deprecated. *)
 From Stdlib Require VectorSpec.
 From Stdlib Require VectorEq.
-Include VectorSpec.
+
+#[deprecated(since="9.3")]
+Abbreviation nth_getFin := VectorSpec.nth_getFin (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation nth_order_getLt := VectorSpec.nth_order_getLt (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation replace_putFin := VectorSpec.replace_putFin (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation replace_order_putLt := VectorSpec.replace_order_putLt (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation shiftin_snoc := VectorSpec.shiftin_snoc (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation take_firstn_dep := VectorSpec.take_firstn_dep (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation take_firstn := VectorSpec.take_firstn (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation splitat_unapp := VectorSpec.splitat_unapp (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation rev_append_tail_rev_append := VectorSpec.rev_append_tail_rev_append (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation cons_inj := VectorSpec.cons_inj (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation nil_spec := VectorSpec.nil_spec (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation eta := VectorSpec.eta (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation eq_nth_iff := VectorSpec.eq_nth_iff (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation nth_order_hd := VectorSpec.nth_order_hd (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation nth_order_tl := VectorSpec.nth_order_tl (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation nth_order_last := VectorSpec.nth_order_last (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation nth_order_ext := VectorSpec.nth_order_ext (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation nth_append_L := VectorSpec.nth_append_L (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation nth_append_R := VectorSpec.nth_append_R (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation In_nth := VectorSpec.In_nth (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation nth_replace_eq := VectorSpec.nth_replace_eq (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation nth_replace_neq := VectorSpec.nth_replace_neq (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation nth_order_replace_eq := VectorSpec.nth_order_replace_eq (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation nth_order_replace_neq := VectorSpec.nth_order_replace_neq (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation replace_id := VectorSpec.replace_id (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation replace_replace_eq := VectorSpec.replace_replace_eq (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation replace_replace_neq := VectorSpec.replace_replace_neq (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation replace_append_L := VectorSpec.replace_append_L (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation replace_append_R := VectorSpec.replace_append_R (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation const_nth := VectorSpec.const_nth (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation nth_map := VectorSpec.nth_map (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation nth_map2 := VectorSpec.nth_map2 (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation map2_ext := VectorSpec.map2_ext (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation fold_left_right_assoc_eq := VectorSpec.fold_left_right_assoc_eq (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation take_O := VectorSpec.take_O (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation take_idem := VectorSpec.take_idem (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation take_app := VectorSpec.take_app (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation take_prf_irr := VectorSpec.take_prf_irr (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation uncons_cons := VectorSpec.uncons_cons (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation append_comm_cons := VectorSpec.append_comm_cons (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation splitat_append := VectorSpec.splitat_append (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation append_splitat := VectorSpec.append_splitat (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation append_inj := VectorSpec.append_inj (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation In_cons_iff := VectorSpec.In_cons_iff (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation Forall_impl := VectorSpec.Forall_impl (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation Forall_forall := VectorSpec.Forall_forall (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation Forall_cons_iff := VectorSpec.Forall_cons_iff (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation Forall_map := VectorSpec.Forall_map (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation Forall_append := VectorSpec.Forall_append (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation Forall_nth := VectorSpec.Forall_nth (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation Forall_nth_order := VectorSpec.Forall_nth_order (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation Forall2_cons_iff := VectorSpec.Forall2_cons_iff (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation Forall2_nth := VectorSpec.Forall2_nth (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation Forall2_nth_order := VectorSpec.Forall2_nth_order (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation Forall2_append := VectorSpec.Forall2_append (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation shiftin_nth := VectorSpec.shiftin_nth (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation shiftin_last := VectorSpec.shiftin_last (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation shiftrepeat_nth := VectorSpec.shiftrepeat_nth (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation shiftrepeat_last := VectorSpec.shiftrepeat_last (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation map_shiftin := VectorSpec.map_shiftin (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation fold_right_shiftin := VectorSpec.fold_right_shiftin (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation In_shiftin := VectorSpec.In_shiftin (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation Forall_shiftin := VectorSpec.Forall_shiftin (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation rev_cons := VectorSpec.rev_cons (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation rev_shiftin := VectorSpec.rev_shiftin (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation In_rev := VectorSpec.In_rev (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation Forall_rev := VectorSpec.Forall_rev (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation of_list_to_list_opp := VectorSpec.of_list_to_list_opp (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation to_list_nil_iff := VectorSpec.to_list_nil_iff (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation to_list_nth_order := VectorSpec.to_list_nth_order (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation to_list_rev_append_tail := VectorSpec.to_list_rev_append_tail (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation to_list_rev_append := VectorSpec.to_list_rev_append (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation to_list_fold_left := VectorSpec.to_list_fold_left (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation to_list_fold_right := VectorSpec.to_list_fold_right (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation to_list_Forall := VectorSpec.to_list_Forall (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation to_list_Exists := VectorSpec.to_list_Exists (only parsing).
+#[deprecated(since="9.3")]
+Abbreviation to_list_Forall2 := VectorSpec.to_list_Forall2 (only parsing).
