@@ -1,6 +1,7 @@
 From subcomponents Require orders_ex.
 From subcomponents Require arith.
 From subcomponents Require zarith.
+From subcomponents Require emaps.
 From Stdlib Require FSets.FMapInterface.
 From Stdlib Require FSets.FSetInterface.
 From Stdlib Require FSets.FSetWeakList.
@@ -16,6 +17,7 @@ From Stdlib Require FSets.FMapFullAVL.
 From Stdlib Require FSets.FSetToFiniteSet.
 From Stdlib Require FSets.FMapAVL.
 From Stdlib Require FSets.FMapPositive.
+From Stdlib Require FSets.FMapTrie.
 From Stdlib Require FSets.FSets.
 From Stdlib Require FSets.FMaps.
 From Stdlib Require FSets.FSetFacts.
