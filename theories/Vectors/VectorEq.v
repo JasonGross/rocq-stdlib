@@ -8,9 +8,11 @@
 (*         *     (see LICENSE file for the text of the license)         *)
 (************************************************************************)
 
-(** N.B.: Using this encoding of vectors is discouraged.
-See <https://github.com/coq/stdlib/blob/master/theories/Vectors/Vector.v>. *)
-
+(** This file is deprecated: the boolean equality [eqb] and [eq_dec] are in
+    [Vector]. This copy stays so that [Require VectorEq] and the names
+    [VectorEq.x] keep working. *)
+Attributes deprecated(since="9.3", note="Use Vector instead of VectorEq.").
+#[local] Set Warnings "-deprecated".
 (** Equalities and Vector relations
 
    Initial Author: Pierre Boutillier
@@ -19,7 +21,6 @@ See <https://github.com/coq/stdlib/blob/master/theories/Vectors/Vector.v>. *)
 
 From Stdlib Require Import PeanoNat.
 
-#[local] Set Warnings "-stdlib-vector,-deprecated".
 From Stdlib Require Import VectorDef.
 From Stdlib Require Import VectorSpec.
 Import VectorNotations.

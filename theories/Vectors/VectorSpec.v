@@ -8,21 +8,20 @@
 (*         *     (see LICENSE file for the text of the license)         *)
 (************************************************************************)
 
-(** Proofs of specification for functions defined over Vector
+(** Properties of the historical Vector interface.
 
-   Initial Author: Pierre Boutillier
-   Institution: PPS, INRIA 12/2010
-*)
-
-#[local] Set Warnings "-stdlib-vector,-deprecated".
+    This file is deprecated: the new interface and its lemmas are in
+    [Vector], which includes this file. The deprecated lemmas stay here so
+    that [Require VectorSpec] and the names [VectorSpec.x] keep working. *)
+Attributes deprecated(since="9.3", note="Use Vector instead of VectorSpec.").
+#[local] Set Warnings "-deprecated".
 From Stdlib Require Fin List.
 From Stdlib Require Import VectorDef PeanoNat Eqdep_dec.
 Import VectorNotations EqNotations.
 
-(** * Properties of the new interface *)
-
-(** [to_list] is injective: most proofs about [vec] go through it. *)
-
+(** Copies of the lemmas of [Vector] that the proofs below use. They are
+    private to this file; use the ones of [Vector]. *)
+Module Private.
 Lemma to_list_inj [A n] (v w : vec A n) : to_list v = to_list w -> v = w.
 Proof.
   induction n; cbn [to_list].
@@ -229,7 +228,7 @@ Proof.
     rewrite ?cast_refl, ?cast_cons, ?IHv; auto using f_equal, cast_ext.
 Qed.
 
-Lemma nth_error_to_list [A n] (v : vec A n) i : List.nth_error v (Fin.val i) = Some (getFin v i).
+Lemma nth_error_to_list [A n] (v : vec A n) i : List.nth_error v (Fin.to_nat i) = Some (getFin v i).
 Proof. induction v; [case Fin.inj_0 | case (Fin.inj_S i) as [->|[? ->] ] ]; cbn; eauto. Qed.
 
 Lemma getFin_inj [A n] (v w : vec A n)
@@ -237,13 +236,18 @@ Lemma getFin_inj [A n] (v w : vec A n)
 Proof.
   apply to_list_inj, List.nth_error_ext; intros i.
   case (Nat.ltb_spec i n) as [Hi|].
-  { rewrite <-(Fin.val_mk i n Hi), !nth_error_to_list; auto using f_equal. }
+  { rewrite <-(Fin.to_nat_mk i n Hi), !nth_error_to_list; auto using f_equal. }
   { rewrite 2 (proj2 (List.nth_error_None _ _)); rewrite ?length_to_list; auto. }
 Qed.
 
 Lemma getFin_inj_iff [A n] (v w : vec A n) :
   (forall i, getFin v i = getFin w i) <-> v = w.
 Proof. split; [apply getFin_inj | intros ->; auto]. Qed.
+
+
+
+End Private.
+Import Private.
 
 (** ** The deprecated operations in terms of the new ones *)
 
@@ -302,6 +306,7 @@ Proof.
     rewrite ?to_list_cast, ?to_list_cons, ?to_list_of_list.
     rewrite !List.rev_append_rev; cbn; rewrite <-!List.app_assoc; trivial. }
 Qed.
+
 
 (** * Properties of the historical interface *)
 
@@ -430,8 +435,8 @@ Proof.
 intros n k1 k2 H v a H1 H2.
 unfold nth_order. rewrite nth_replace_neq; [reflexivity|].
 intros E. apply H.
-apply (f_equal (fun p => proj1_sig (Fin.to_nat p))) in E.
-now rewrite !Fin.to_nat_of_nat in E.
+apply (f_equal (fun p => proj1_sig (Fin.to_nat_sig p))) in E.
+now rewrite !Fin.to_nat_sig_of_nat in E.
 Qed.
 
 Lemma replace_id A: forall n p (v : t A n),
@@ -492,8 +497,6 @@ Proof.
 now induction p.
 Qed.
 
-#[deprecated(since="9.3", use=app_repeat_repeat)]
-Abbreviation append_const := app_repeat_repeat (only parsing).
 
 (** ** Properties of [map] *)
 
@@ -509,8 +512,6 @@ subst p2; induction p1 as [n|n p1 IHp1].
 - revert n v p1 IHp1; refine (@caseS _  _ _); now simpl.
 Qed.
 
-#[deprecated(since="9.3", use=map_app_vec)]
-Abbreviation map_append := map_app_vec (only parsing).
 
 Lemma nth_map2 {A B C} (f: A -> B -> C) {n} v w (p1 p2 p3: Fin.t n):
   p1 = p2 -> p2 = p3 -> (map2 f v w) [@p1] = f (v[@p2]) (w[@p3]).
@@ -706,7 +707,7 @@ Proof.
 intros P n v. rewrite Forall_nth. split.
 - intros H i Hi. apply H.
 - intros H p.
-  rewrite <- (Fin.of_nat_to_nat_inv p).
+  rewrite <- (Fin.of_nat_to_nat_sig_inv p).
   apply H.
 Qed.
 
@@ -745,7 +746,7 @@ intros P n v1 v2. rewrite Forall2_nth. split.
   rewrite (nth_order_ext _ _ _ _ Hi1 Hi2).
   apply H.
 - intros H p.
-  rewrite <- (Fin.of_nat_to_nat_inv p).
+  rewrite <- (Fin.of_nat_to_nat_sig_inv p).
   apply H.
 Qed.
 
@@ -838,8 +839,6 @@ Proof. intros; rewrite shiftin_snoc; apply rev_snoc. Qed.
 
 
 
-#[deprecated(since="9.3", use=fold_right_rev)]
-Abbreviation fold_left_rev_right := fold_right_rev (only parsing).
 
 Lemma In_rev A: forall a n (v : t A n),
   In a (rev v) <-> In a v.
@@ -859,8 +858,6 @@ Qed.
 
 (** ** Properties of [to_list] *)
 
-#[deprecated(since="9.3", use=to_list_of_list)]
-Abbreviation to_list_of_list_opp := to_list_of_list (only parsing).
 
 
 Lemma of_list_to_list_opp A n (v: t A n):
@@ -886,14 +883,8 @@ split; intro H.
 Qed.
 
 
-#[deprecated(since="9.3", use=hd_to_list)]
-Abbreviation to_list_hd := hd_to_list (only parsing).
 
-#[deprecated(since="9.3", use=last_to_list)]
-Abbreviation to_list_last := last_to_list (only parsing).
 
-#[deprecated(since="9.3", use=to_list_repeat)]
-Abbreviation to_list_const := to_list_repeat (only parsing).
 
 Lemma to_list_nth_order A n (v : t A n) p (H : p < n) d:
   nth_order v H = List.nth p (to_list v) d.
@@ -905,8 +896,6 @@ induction v as [|a n v IH].
 Qed.
 
 
-#[deprecated(since="9.3", use=to_list_app)]
-Abbreviation to_list_append := to_list_app (only parsing).
 
 Lemma to_list_rev_append_tail A n m (v1 : t A n) (v2 : t A m):
   to_list (rev_append_tail v1 v2) = List.rev_append (to_list v1) (to_list v2).
@@ -961,3 +950,4 @@ split; intros HF.
     rewrite (eta v2) in Heql2; inversion Heql2; subst.
     rewrite (eta v2); constructor; auto.
 Qed.
+

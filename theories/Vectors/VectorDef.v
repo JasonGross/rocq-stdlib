@@ -20,7 +20,7 @@
     The historical interface ([t], [nil A], [cons A h n v], [nth],
     [append], ...) follows the new one below; it is deprecated. *)
 
-#[local] Set Warnings "-deprecated,-stdlib-vector".
+#[local] Set Warnings "+deprecated".
 From Stdlib Require Import PeanoNat List Arith_base.
 From Stdlib Require Fin.
 Import EqNotations.
@@ -273,6 +273,8 @@ Definition putLt {n} (v: vec A n) {p} (H: p < n) := putFin v (Fin.mk _ _ H).
 End UniformElementType.
 
 (** * The historical interface, deprecated *)
+
+#[local] Set Warnings "-deprecated".
 
 (** The constructors get back the argument structure of the old [Vector.t],
 in which the element type and the length are explicit arguments: this

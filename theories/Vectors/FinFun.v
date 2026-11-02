@@ -8,21 +8,18 @@
 (*         *     (see LICENSE file for the text of the license)         *)
 (************************************************************************)
 
-(** An example of finite type : [Fin.t] *)
-#[local] Set Warnings "-stdlib-vector,-deprecated".
+(** An example of finite type : [fin] *)
 Set Implicit Arguments.
 From Stdlib Require Import PeanoNat Compare_dec List Finite Fin Permutation.
 Export Finite. (* compat 9.0 *)
 
-Lemma Fin_Finite n : Finite (Fin.t n).
+Lemma Fin_Finite n : Finite (fin n).
 Proof.
  induction n as [|n IHn].
- - exists nil.
-   red;inversion 1.
+ - exists nil. intros a. case (Fin.inj_0 a).
  - destruct IHn as (l,Hl).
-   exists (Fin.F1 :: map Fin.FS l).
-   intros a. revert n a l Hl.
-   refine (@Fin.caseS _ _ _); intros.
+   exists (Fin.finO :: map Fin.finS l).
+   intros a. destruct (Fin.inj_S a) as [->|[j ->]].
    + now left.
    + right. now apply in_map.
 Qed.
@@ -39,27 +36,27 @@ Definition bInjective n (f:nat->nat) :=
 Definition bSurjective n (f:nat->nat) :=
  forall y, y < n -> exists x, x < n /\ f x = y.
 
-(** We show that this is equivalent to the use of [Fin.t n]. *)
+(** We show that this is equivalent to the use of [fin n]. *)
 
 Module Fin2Restrict.
 
-Abbreviation n2f := Fin.of_nat_lt.
-Definition f2n {n} (x:Fin.t n) := proj1_sig (Fin.to_nat x).
-Definition f2n_ok n (x:Fin.t n) : f2n x < n := proj2_sig (Fin.to_nat x).
-Definition n2f_f2n : forall n x, n2f (f2n_ok x) = x := @Fin.of_nat_to_nat_inv.
-Definition f2n_n2f x n h : f2n (n2f h) = x := f_equal (@proj1_sig _ _) (@Fin.to_nat_of_nat x n h).
-Definition n2f_ext : forall x n h h', n2f h = n2f h' := @Fin.of_nat_ext.
+Definition n2f {x n} (h : x < n) : fin n := Fin.mk n x h.
+Definition f2n {n} (x:fin n) := Fin.to_nat x.
+Definition f2n_ok n (x:fin n) : f2n x < n := Fin.to_nat_bound x.
+Definition n2f_f2n : forall n (x : fin n), n2f (f2n_ok x) = x := fun n x => Fin.mk_to_nat x (f2n_ok x).
+Definition f2n_n2f x n h : f2n (n2f h) = x := Fin.to_nat_mk x n h.
+Definition n2f_ext : forall x n (h h' : x < n), n2f h = n2f h' := fun x n h h' => Fin.mk_ext h h'.
 Definition f2n_inj : forall n x y, f2n x = f2n y -> x = y := @Fin.to_nat_inj.
 
-Definition extend n (f:Fin.t n -> Fin.t n) : (nat->nat) :=
+Definition extend n (f:fin n -> fin n) : (nat->nat) :=
  fun x =>
    match le_lt_dec n x with
      | left _ => 0
      | right h => f2n (f (n2f h))
    end.
 
-Definition restrict n (f:nat->nat)(hf : bFun n f) : (Fin.t n -> Fin.t n) :=
- fun x => let (x',h) := Fin.to_nat x in n2f (hf _ h).
+Definition restrict n (f:nat->nat)(hf : bFun n f) : (fin n -> fin n) :=
+ fun x => n2f (hf _ (f2n_ok x)).
 
 Ltac break_dec H :=
  let H' := fresh "H" in
@@ -72,12 +69,9 @@ Proof.
  intros x h. unfold extend. break_dec h. apply f2n_ok.
 Qed.
 
-Lemma extend_f2n n f (x:Fin.t n) : extend f (f2n x) = f2n (f x).
+Lemma extend_f2n n f (x:fin n) : extend f (f2n x) = f2n (f x).
 Proof.
- generalize (n2f_f2n x). unfold extend, f2n, f2n_ok.
- destruct (Fin.to_nat x) as (x',h); simpl.
- break_dec h.
- now intros ->.
+ unfold extend. break_dec (f2n_ok x). now rewrite n2f_f2n.
 Qed.
 
 Lemma extend_n2f n f x (h:x<n) : n2f (extend_ok f h) = f (n2f h).
@@ -86,19 +80,17 @@ Proof.
  rewrite <- n2f_f2n. now apply n2f_ext.
 Qed.
 
-Lemma restrict_f2n n f hf (x:Fin.t n) :
+Lemma restrict_f2n n f hf (x:fin n) :
  f2n (@restrict n f hf x) = f (f2n x).
 Proof.
- unfold restrict, f2n. destruct (Fin.to_nat x) as (x',h); simpl.
- apply f2n_n2f.
+ unfold restrict. apply f2n_n2f.
 Qed.
 
 Lemma restrict_n2f n f hf x (h:x<n) :
  @restrict n f hf (n2f h) = n2f (hf _ h).
 Proof.
- unfold restrict. generalize (f2n_n2f h). unfold f2n.
- destruct (Fin.to_nat (n2f h)) as (x',h'); simpl. intros ->.
- now apply n2f_ext.
+ unfold restrict. generalize (f2n_ok (n2f h)). rewrite (f2n_n2f h).
+ intros h'. now apply n2f_ext.
 Qed.
 
 Lemma extend_surjective n f :

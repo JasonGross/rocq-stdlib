@@ -9,7 +9,7 @@
 (************************************************************************)
 
 From Stdlib Require Import PeanoNat Peano_dec.
-#[local] Set Warnings "-deprecated".
+#[local] Set Warnings "+deprecated".
 From Stdlib Require Arith_base.
 
 (** N.B.: This file defines a dependently-type programming view of
@@ -36,7 +36,7 @@ the n-uplet. If [f] is the k-th element of the (n-1)-uplet, [FS f] is the
 
 (** * The new interface: [fin n]
 
-    Proofs about [fin] go through the injective conversion [val] to [nat]
+    Proofs about [fin] go through the injective conversion [to_nat] to [nat]
     and the small inversions [inj_0] and [inj_S], not through dependent
     pattern matching. The historical interface ([t], [F1], [FS], [to_nat],
     [of_nat_lt], ...) follows below; it is deprecated. *)
@@ -44,15 +44,15 @@ the n-uplet. If [f] is the k-th element of the (n-1)-uplet, [FS f] is the
 Inductive fin : nat -> Type :=
 | finO {n}             : fin (S n)
 | finS {n} (_ : fin n) : fin (S n).
-Notation fin0 := finO (only parsing).
+Abbreviation fin0 := finO (only parsing).
 
-(** [val i] is the natural number that [i] represents. *)
-Fixpoint val {n} (i : fin n) : nat :=
+(** [to_nat i] is the natural number that [i] represents. *)
+Fixpoint to_nat {n} (i : fin n) : nat :=
   match i with
   | finO => 0
-  | finS i => S (val i)
+  | finS i => S (to_nat i)
   end.
-Coercion val : fin >-> nat.
+Coercion to_nat : fin >-> nat.
 
 Definition cast {m} (v: fin m) {n} : m = n -> fin n :=
   match Nat.eq_dec m n with
@@ -104,65 +104,67 @@ Proof.
   | finO | _ => _ end _ _ _); eauto.
 Qed.
 
-Lemma val_inj [n] (i j : fin n) : val i = val j -> i = j.
+Lemma to_nat_inj [n] (i j : fin n) : to_nat i = to_nat j -> i = j.
 Proof.
   induction i; pose proof inj_S j; firstorder subst; try discriminate;
-    cbn [val] in *; eauto using f_equal.
+    cbn [to_nat] in *; eauto using f_equal.
 Qed.
 
-Lemma val_inj_iff [n] (i j : fin n) : val i = val j <-> i = j.
-Proof. split; try apply val_inj; congruence. Qed.
+Lemma to_nat_inj_iff [n] (i j : fin n) : to_nat i = to_nat j <-> i = j.
+Proof. split; try apply to_nat_inj; congruence. Qed.
 
-Lemma val_inj_dep [n] (i : fin n) [m] (j : fin m) : n = m -> val i = val j ->
+Lemma to_nat_inj_dep [n] (i : fin n) [m] (j : fin m) : n = m -> to_nat i = to_nat j ->
   existT _ _ i = existT _ _ j.
-Proof. destruct 1; auto using f_equal, val_inj. Qed.
+Proof. destruct 1; auto using f_equal, to_nat_inj. Qed.
 
-Lemma val_0 n : val (@finO n) = 0.
+Lemma to_nat_0 n : to_nat (@finO n) = 0.
 Proof. trivial. Qed.
 
-Lemma val_S [n] (i : fin n) : val (finS i) = S (val i).
+Lemma to_nat_S [n] (i : fin n) : to_nat (finS i) = S (to_nat i).
 Proof. trivial. Qed.
 
-Lemma val_bound [n] (i : fin n) : val i < n.
+Lemma to_nat_bound [n] (i : fin n) : to_nat i < n.
 Proof.
-  induction i; cbn [val]. { apply Nat.lt_0_succ. }
+  induction i; cbn [to_nat]. { apply Nat.lt_0_succ. }
   rewrite <-Nat.succ_lt_mono. apply IHi.
 Qed.
 
-Lemma val_eq_rect [m n] (p : m = n) i : val (eq_rect m fin i n p) = val i.
+Lemma to_nat_eq_rect [m n] (p : m = n) i : to_nat (eq_rect m fin i n p) = to_nat i.
 Proof. case p; trivial. Qed.
 
-Lemma val_cast [m n] (p : m = n) (i : fin m) : val (cast i p) = val i.
-Proof. cbv[cast]. case Nat.eq_dec; intros; [apply val_eq_rect|contradiction]. Qed.
+Lemma to_nat_cast [m n] (p : m = n) (i : fin m) : to_nat (cast i p) = to_nat i.
+Proof. cbv[cast]. case Nat.eq_dec; intros; [apply to_nat_eq_rect|contradiction]. Qed.
 
 Lemma cast_ext [m n] (p q : m = n) (i : fin m) : cast i p = cast i q.
-Proof. apply val_inj; rewrite 2 val_cast; trivial. Qed.
+Proof. apply to_nat_inj; rewrite 2 to_nat_cast; trivial. Qed.
 
-Lemma val_add_nat n [m] (i : fin m) : val (add_nat n i) = n+i.
-Proof. induction n; cbn [val add_nat Nat.add]; auto. Qed.
+Lemma to_nat_add_nat n [m] (i : fin m) : to_nat (add_nat n i) = n+i.
+Proof. induction n; cbn [to_nat add_nat Nat.add]; auto. Qed.
 
-Lemma val_relax n [m] (i : fin m) : val (relax n i) = i.
-Proof. induction i; cbn [val relax]; auto. Qed.
+Lemma to_nat_relax n [m] (i : fin m) : to_nat (relax n i) = i.
+Proof. induction i; cbn [to_nat relax]; auto. Qed.
 
-Lemma val_mk i n p : val (mk n i p) = i.
+Lemma to_nat_mk i n p : to_nat (mk n i p) = i.
 Proof.
   cbv [mk].
-  rewrite val_cast, val_add_nat, val_0, Nat.add_0_r; trivial.
+  rewrite to_nat_cast, to_nat_add_nat, to_nat_0, Nat.add_0_r; trivial.
 Qed.
 
-Lemma mk_val [n] i p : mk n (val i) p = i.
-Proof. apply val_inj, val_mk. Qed.
+Lemma mk_to_nat [n] i p : mk n (to_nat i) p = i.
+Proof. apply to_nat_inj, to_nat_mk. Qed.
 
 Lemma mk_ext [n i] (p q : i < n) : mk n i p = mk n i q.
 Proof. apply cast_ext. Qed.
 
 Lemma finS_inj {n} (x y : fin n) : finS x = finS y -> x = y.
-Proof. rewrite <-!val_inj_iff; cbn [val]; congruence. Qed.
+Proof. rewrite <-!to_nat_inj_iff; cbn [to_nat]; congruence. Qed.
 
-Lemma val_last n : val (last n) = n.
-Proof. induction n; cbn [val last]; auto. Qed.
+Lemma to_nat_last n : to_nat (last n) = n.
+Proof. induction n; cbn [to_nat last]; auto. Qed.
 
 (** * The historical interface, deprecated *)
+
+#[local] Set Warnings "-deprecated".
 
 #[deprecated(since="9.3", use=fin)]
 Abbreviation t := fin (only parsing).
@@ -232,12 +234,12 @@ match eq in _ = a return
   eq_refl => eq_refl
 end.
 
-(** [to_nat f] = p iff [f] is the p{^ th} element of [fin m]. *)
-#[deprecated(since="9.3", use=val)]
-Fixpoint to_nat {m} (n : t m) : {i | i < m} :=
+(** [to_nat_sig f] = p iff [f] is the p{^ th} element of [fin m]. *)
+#[deprecated(since="9.3", use=to_nat)]
+Fixpoint to_nat_sig {m} (n : t m) : {i | i < m} :=
   match n with
     |@F1 j => exist _ 0 (Nat.lt_0_succ j)
-    |FS p => match to_nat p with |exist _ i P => exist _ (S i) (proj1 (Nat.succ_lt_mono _ _) P) end
+    |FS p => match to_nat_sig p with |exist _ i P => exist _ (S i) (proj1 (Nat.succ_lt_mono _ _) P) end
   end.
 
 (** [of_nat p n] answers the p{^ th} element of [fin n] if p < n or a proof of
@@ -274,43 +276,43 @@ Proof.
  now rewrite (Peano_dec.le_unique _ _ h h').
 Qed.
 
-#[deprecated(since="9.3", use=mk_val)]
-Lemma of_nat_to_nat_inv {m} (p : t m) : of_nat_lt (proj2_sig (to_nat p)) = p.
+#[deprecated(since="9.3", use=mk_to_nat)]
+Lemma of_nat_to_nat_sig_inv {m} (p : t m) : of_nat_lt (proj2_sig (to_nat_sig p)) = p.
 Proof.
 induction p as [|? p]; simpl.
 - reflexivity.
-- destruct (to_nat p); simpl in *. f_equal. subst p. apply of_nat_ext.
+- destruct (to_nat_sig p); simpl in *. f_equal. subst p. apply of_nat_ext.
 Qed.
 
-#[deprecated(since="9.3", use=val_mk)]
-Lemma to_nat_of_nat {p}{n} (h : p < n) : to_nat (of_nat_lt h) = exist _ p h.
+#[deprecated(since="9.3", use=to_nat_mk)]
+Lemma to_nat_sig_of_nat {p}{n} (h : p < n) : to_nat_sig (of_nat_lt h) = exist _ p h.
 Proof.
 revert p h. induction n as [|n IHn].
 - intros p h. destruct (Nat.nlt_0_r p h).
 - intros [|p] h; cbn; [|rewrite IHn]; f_equal; apply Peano_dec.le_unique.
 Qed.
 
-#[deprecated(since="9.3", use=val_inj)]
-Lemma to_nat_inj {n} (p q : t n) :
- proj1_sig (to_nat p) = proj1_sig (to_nat q) -> p = q.
+#[deprecated(since="9.3", use=to_nat_inj)]
+Lemma to_nat_sig_inj {n} (p q : t n) :
+ proj1_sig (to_nat_sig p) = proj1_sig (to_nat_sig q) -> p = q.
 Proof.
  intro H.
- rewrite <- (of_nat_to_nat_inv p), <- (of_nat_to_nat_inv q).
- destruct (to_nat p) as (np,hp), (to_nat q) as (nq,hq); simpl in *.
+ rewrite <- (of_nat_to_nat_sig_inv p), <- (of_nat_to_nat_sig_inv q).
+ destruct (to_nat_sig p) as (np,hp), (to_nat_sig q) as (nq,hq); simpl in *.
  revert hp hq. rewrite H. apply of_nat_ext.
 Qed.
 
-#[deprecated(since="9.3", use=val)]
-Lemma to_nat_val {n} (p : t n) : proj1_sig (to_nat p) = val p.
+#[deprecated(since="9.3", use=to_nat)]
+Lemma to_nat_sig_to_nat {n} (p : t n) : proj1_sig (to_nat_sig p) = to_nat p.
 Proof.
- induction p as [|? p IHp]; cbn [to_nat val]; trivial.
- destruct (to_nat p); cbn in *; congruence.
+ induction p as [|? p IHp]; cbn [to_nat_sig to_nat]; trivial.
+ destruct (to_nat_sig p); cbn in *; congruence.
 Qed.
 
 #[deprecated(since="9.3", use=mk)]
 Lemma of_nat_lt_mk {p n} (h : p < n) : of_nat_lt h = mk n p h.
 Proof.
- apply val_inj. rewrite val_mk, <-to_nat_val, to_nat_of_nat; trivial.
+ apply to_nat_inj. rewrite to_nat_mk, <-to_nat_sig_to_nat, to_nat_sig_of_nat; trivial.
 Qed.
 
 
@@ -334,11 +336,11 @@ end.
 Abbreviation L n := (relax n) (only parsing).
 
 #[deprecated(since="9.3", note="Please open an issue if you would like stdlib to keep this definition.")]
-Lemma L_sanity {m} n (p : t m) : proj1_sig (to_nat (L n p)) = proj1_sig (to_nat p).
+Lemma L_sanity {m} n (p : t m) : proj1_sig (to_nat_sig (L n p)) = proj1_sig (to_nat_sig p).
 Proof.
 induction p as [|? p IHp].
 - reflexivity.
-- simpl; destruct (to_nat (L n p)); simpl in *; rewrite IHp. now destruct (to_nat p).
+- simpl; destruct (to_nat_sig (L n p)); simpl in *; rewrite IHp. now destruct (to_nat_sig p).
 Qed.
 
 #[deprecated(since="9.3", note="Please open an issue if you would like stdlib to keep this definition.")]
@@ -369,11 +371,11 @@ Defined.
 Abbreviation R n := (add_nat n) (only parsing).
 
 #[deprecated(since="9.3", note="Please open an issue if you would like stdlib to keep this definition.")]
-Lemma R_sanity {m} n (p : t m) : proj1_sig (to_nat (R n p)) = n + proj1_sig (to_nat p).
+Lemma R_sanity {m} n (p : t m) : proj1_sig (to_nat_sig (R n p)) = n + proj1_sig (to_nat_sig p).
 Proof.
 induction n as [|n IHn].
 - reflexivity.
-- simpl; destruct (to_nat (R n p)); simpl in *; rewrite IHn. now destruct (to_nat p).
+- simpl; destruct (to_nat_sig (R n p)); simpl in *; rewrite IHn. now destruct (to_nat_sig p).
 Qed.
 
 #[deprecated(since="9.3", note="Please open an issue if you would like stdlib to keep this definition.")]
@@ -448,12 +450,12 @@ end.
 
 #[deprecated(since="9.3", note="Please open an issue if you would like stdlib to keep this definition.")]
 Lemma depair_sanity {m n} (o : t m) (p : t n) :
-  proj1_sig (to_nat (depair o p)) = n * (proj1_sig (to_nat o)) + (proj1_sig (to_nat p)).
+  proj1_sig (to_nat_sig (depair o p)) = n * (proj1_sig (to_nat_sig o)) + (proj1_sig (to_nat_sig p)).
 Proof.
 induction o as [|? o IHo] ; simpl.
 - rewrite L_sanity. now rewrite Nat.mul_0_r.
 - rewrite R_sanity. rewrite IHo.
-  rewrite Nat.add_assoc. destruct (to_nat o); simpl; rewrite Nat.mul_succ_r.
+  rewrite Nat.add_assoc. destruct (to_nat_sig o); simpl; rewrite Nat.mul_succ_r.
     now rewrite (Nat.add_comm n).
 Qed.
 

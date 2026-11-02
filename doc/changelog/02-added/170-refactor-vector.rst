@@ -1,10 +1,10 @@
 - in `Vectors/VectorDef.v`, `Vectors/VectorSpec.v` and `Vectors/Fin.v`
 
   + new interface for length-indexed lists (`vec`) and bounded natural
-    numbers (`fin`, with `finO`, `finS`, `val`, `mk`). The types are the
+    numbers (`fin`, with `finO`, `finS`, `to_nat`, `mk`). The types are the
     same inductives as before under new names, but the element type and
     the length are implicit arguments of the constructors, and the
-    lemmas reason through the injective conversions `to_list` and `val`
+    lemmas reason through the injective conversions `to_list` and `to_nat`
     and the small inversions `inj_0` and `inj_S` instead of dependent
     pattern matching. Operations follow the names of `List`: `app`,
     `rev`, `firstn`, `skipn`, `repeat`, `snoc`, `get`, `put`, `getFin`,
