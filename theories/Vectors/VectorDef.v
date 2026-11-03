@@ -272,6 +272,27 @@ Definition getLt {n} (v: vec A n) {p} (H: p < n) := getFin v (Fin.mk _ _ H).
 Definition putLt {n} (v: vec A n) {p} (H: p < n) := putFin v (Fin.mk _ _ H).
 End UniformElementType.
 
+(** * [getFin] and [map], [unapp] and [app] *)
+
+Lemma getFin_map [A B] (f : A -> B) [n] (v : vec A n) i :
+  getFin (map f v) i = f (getFin v i).
+Proof.
+  induction v; [case (Fin.inj_0 i)|destruct (Fin.inj_S i) as [->|[j ->]]]; cbn; auto.
+Qed.
+
+Lemma unapp_app [A] n m (v1 : vec A n) (v2 : vec A m) : unapp n (app v1 v2) = (v1, v2).
+Proof.
+  induction v1 as [|a n v1 IH]; cbn; [reflexivity|]. now rewrite IH.
+Qed.
+
+Lemma app_unapp [A] n m (v : vec A (n + m)) v1 v2 : unapp n v = (v1, v2) -> v = app v1 v2.
+Proof.
+  revert v v1 v2; induction n as [|n IH]; intros v v1 v2 E; cbn in E.
+  - injection E as <- <-. reflexivity.
+  - rewrite (inj_S v) in *. cbn in E. destruct (unapp n (tl v)) as [w1 w2] eqn:E'.
+    injection E as <- <-. cbn. f_equal. now apply IH.
+Qed.
+
 (** * Boolean equality *)
 
 Section BEQ.

@@ -9,7 +9,7 @@
     pattern matching. Operations follow the names of `List`: `app`,
     `rev`, `firstn`, `skipn`, `repeat`, `snoc`, `get`, `put`, `getFin`,
     `putFin`, `cast`; boolean equality `eqb` with `eqb_eq`, `eq_dec` and the
-    `BoolSpec` lemma `eqb_spec`
+    `BoolSpec` lemma `eqb_spec`; lemmas `getFin_map`, `unapp_app`, `app_unapp`
     (`#170 <https://github.com/coq/stdlib/pull/170>`_,
     fixes `#54 <https://github.com/coq/stdlib/issues/54>`_,
     by Andres Erbsen, with help of Jason Gross).

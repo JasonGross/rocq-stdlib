@@ -732,7 +732,7 @@ Qed.
 #[deprecated(since="9.4", use=app_repeat_repeat)]
 Abbreviation append_const := Private.app_repeat_repeat (only parsing).
 
-#[deprecated(since="9.4", use=getFin, note="Stated for a deprecated operation; see the lemmas about vec in Vector.")]
+#[deprecated(since="9.4", use=getFin_map)]
 Lemma nth_map {A B} (f: A -> B) {n} v (p1 p2: Fin.t n) (eq: p1 = p2):
   (map f v) [@ p1] = f (v [@ p2]).
 Proof.
@@ -808,7 +808,7 @@ Proof. reflexivity. Qed.
 (* [append] *)
 
 
-#[deprecated(since="9.4", use=unapp, note="Stated for a deprecated operation; see the lemmas about vec in Vector.")]
+#[deprecated(since="9.4", use=unapp_app)]
 Lemma splitat_append {A} : forall {n m : nat} (v : t A n) (w : t A m),
   splitat n (v ++ w) = (v, w).
 Proof.
@@ -817,7 +817,7 @@ Proof.
   - cbn. now rewrite IH.
 Qed.
 
-#[deprecated(since="9.4", use=unapp, note="Stated for a deprecated operation; see the lemmas about vec in Vector.")]
+#[deprecated(since="9.4", use=app_unapp)]
 Lemma append_splitat {A} : forall {n m : nat} (v : t A n) (w : t A m) (vw : t A (n+m)),
   splitat n vw = (v, w) -> vw = v ++ w.
 Proof.

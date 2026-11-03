@@ -604,7 +604,7 @@ Abbreviation replace_append_R := VectorSpec.replace_append_R (only parsing).
 Abbreviation const_nth := VectorSpec.const_nth (only parsing).
 #[deprecated(since="9.4", use=app_repeat_repeat)]
 Abbreviation append_const := app_repeat_repeat (only parsing).
-#[deprecated(since="9.4", use=getFin, note="Stated for a deprecated operation; see the lemmas about vec in Vector.")]
+#[deprecated(since="9.4", use=getFin_map)]
 Abbreviation nth_map := VectorSpec.nth_map (only parsing).
 #[deprecated(since="9.4", use=map_app_vec)]
 Abbreviation map_append := map_app_vec (only parsing).
@@ -620,9 +620,9 @@ Abbreviation take_app := VectorSpec.take_app (only parsing).
 Abbreviation take_prf_irr := VectorSpec.take_prf_irr (only parsing).
 #[deprecated(since="9.4", note="If you would like stdlib to keep this lemma, please open an issue.")]
 Abbreviation uncons_cons := VectorSpec.uncons_cons (only parsing).
-#[deprecated(since="9.4", use=unapp, note="Stated for a deprecated operation; see the lemmas about vec in Vector.")]
+#[deprecated(since="9.4", use=unapp_app)]
 Abbreviation splitat_append := VectorSpec.splitat_append (only parsing).
-#[deprecated(since="9.4", use=unapp, note="Stated for a deprecated operation; see the lemmas about vec in Vector.")]
+#[deprecated(since="9.4", use=app_unapp)]
 Abbreviation append_splitat := VectorSpec.append_splitat (only parsing).
 #[deprecated(since="9.4", use=getFin, note="Stated for a deprecated operation; see the lemmas about vec in Vector.")]
 Abbreviation Forall_nth := VectorSpec.Forall_nth (only parsing).
