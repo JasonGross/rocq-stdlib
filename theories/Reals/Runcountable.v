@@ -13,7 +13,7 @@ From Stdlib.Reals Require Import Rdefinitions.
 From Stdlib.Reals Require Import Raxioms.
 From Stdlib Require Import Rfunctions.
 From Stdlib.Reals Require Import RIneq.
-From Stdlib Require Import FinFun.
+From Stdlib Require Import Finite.
 From Stdlib.Logic Require Import ConstructiveEpsilon.
 
 

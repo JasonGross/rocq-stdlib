@@ -8,17 +8,19 @@
 (*         *     (see LICENSE file for the text of the license)         *)
 (************************************************************************)
 
-(** N.B.: Using this encoding of vectors is discouraged.
-See <https://github.com/coq/stdlib/blob/master/theories/Vectors/Vector.v>. *)
-Attributes warn(cats="stdlib vector", note="Using Vector.t is known to be technically difficult, see <https://github.com/rocq-prover/stdlib/blob/master/theories/Vectors/Vector.v>.").
-
+(** Everything in this file is deprecated: the boolean equality [eqb] and
+    [eq_dec] are in [VectorDef]. This copy stays so that [Require VectorEq]
+    and the names [VectorEq.x] keep working. The file itself carries no
+    deprecation attribute, because [Vector] requires it. *)
+#[local] Set Warnings "-deprecated".
 (** Equalities and Vector relations
 
    Initial Author: Pierre Boutillier
    Institution: PPS, INRIA 07/2012
 *)
 
-#[local] Set Warnings "-stdlib-vector".
+From Stdlib Require Import PeanoNat.
+
 From Stdlib Require Import VectorDef.
 From Stdlib Require Import VectorSpec.
 Import VectorNotations.
@@ -28,15 +30,15 @@ Section BEQ.
  Variables (A: Type) (A_beq: A -> A -> bool).
  Hypothesis A_eqb_eq: forall x y, A_beq x y = true <-> x = y.
 
- Definition eqb:
-   forall {m n} (v1: t A m) (v2: t A n), bool :=
-   fix fix_beq {m n} v1 v2 :=
+ #[deprecated(since="9.4", use=VectorDef.eqb)]
+ Fixpoint eqb {m n} (v1: t A m) (v2: t A n) : bool :=
    match v1, v2 with
-     |[], [] => true
-     |_ :: _, [] |[], _ :: _ => false
-     |h1 :: t1, h2 :: t2 => A_beq h1 h2 && fix_beq t1 t2
-   end%bool.
+   | [], [] => true
+   | h1::t1, h2::t2 => A_beq h1 h2 && eqb t1 t2
+   | _, _ => false
+   end.
 
+ #[deprecated(since="9.4", use=VectorDef.eqb_nat_eq)]
  Lemma eqb_nat_eq: forall m n (v1: t A m) (v2: t A n)
   (Hbeq: eqb v1 v2 = true), m = n.
  Proof.
@@ -47,6 +49,7 @@ Section BEQ.
    f_equal; eauto.
  Qed.
 
+ #[deprecated(since="9.4", use=VectorDef.eqb_eq)]
  Lemma eqb_eq: forall n (v1: t A n) (v2: t A n),
   eqb v1 v2 = true <-> v1 = v2.
  Proof.
@@ -58,6 +61,7 @@ Section BEQ.
      split; now auto.
  Qed.
 
+ #[deprecated(since="9.4", use=VectorDef.eq_dec)]
  Definition eq_dec n (v1 v2: t A n): {v1 = v2} + {v1 <> v2}.
  Proof.
  case_eq (eqb v1 v2); intros.
@@ -67,21 +71,6 @@ Section BEQ.
 
 End BEQ.
 
-Section CAST.
-
- Definition cast: forall {A m} (v: t A m) {n}, m = n -> t A n.
- Proof.
- refine (fix cast {A m} (v: t A m) {struct v} :=
-  match v in t _ m' return forall n, m' = n -> t A n with
-  |[] => fun n => match n with
-    | 0 => fun _ => []
-    | S _ => fun H => False_rect _ _
-  end
-  |h :: w => fun n => match n with
-    | 0 => fun H => False_rect _ _
-    | S n' => fun H => h :: (cast w n' (f_equal pred H))
-  end
- end); discriminate.
- Defined.
-
-End CAST.
+(** [cast] used to be defined here; it is now [VectorDef.cast]. *)
+#[deprecated(since="9.4", use=VectorDef.cast)]
+Abbreviation cast := VectorDef.cast (only parsing).
