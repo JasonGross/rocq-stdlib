@@ -8,7 +8,8 @@
     and the small inversions `inj_0` and `inj_S` instead of dependent
     pattern matching. Operations follow the names of `List`: `app`,
     `rev`, `firstn`, `skipn`, `repeat`, `snoc`, `get`, `put`, `getFin`,
-    `putFin`, `cast`
+    `putFin`, `cast`; boolean equality `eqb` with `eqb_eq`, `eq_dec` and the
+    `BoolSpec` lemma `eqb_spec`
     (`#170 <https://github.com/coq/stdlib/pull/170>`_,
     fixes `#54 <https://github.com/coq/stdlib/issues/54>`_,
     by Andres Erbsen, with help of Jason Gross).

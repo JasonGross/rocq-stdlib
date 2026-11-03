@@ -316,6 +316,13 @@ Section BEQ.
   + right. intros Heq. apply <- eqb_eq in Heq. congruence.
  Defined.
 
+ Lemma eqb_spec n (v1 v2 : vec A n) : BoolSpec (v1 = v2) (v1 <> v2) (eqb v1 v2).
+ Proof.
+ case_eq (eqb v1 v2); intros E; constructor.
+  + now apply eqb_eq.
+  + intros Heq. apply <- eqb_eq in Heq. congruence.
+ Qed.
+
 End BEQ.
 
 (** * The historical interface, deprecated *)
@@ -326,27 +333,26 @@ End BEQ.
 in which the element type and the length are explicit arguments: this
 [Arguments] command keeps working the commands [Arguments Vector.nil {A}]
 and [Arguments Vector.cons {A} _ {n}] that users wrote for them. *)
-#[deprecated(since="9.3", use=vec)]
+#[deprecated(since="9.4", use=vec)]
 Abbreviation t := vec (only parsing).
 Arguments nil : clear implicits.
 Arguments cons : clear implicits.
-#[deprecated(since="9.3", use=vec_ind)]
+#[deprecated(since="9.4", use=vec_ind)]
 Abbreviation t_ind := vec_ind (only parsing).
-#[deprecated(since="9.3", use=vec_rect)]
+#[deprecated(since="9.4", use=vec_rect)]
 Abbreviation t_rect := vec_rect (only parsing).
-#[deprecated(since="9.3", use=vec_rec)]
+#[deprecated(since="9.4", use=vec_rec)]
 Abbreviation t_rec := vec_rec (only parsing).
-#[deprecated(since="9.3", use=vec_sind)]
+#[deprecated(since="9.4", use=vec_sind)]
 Abbreviation t_sind := vec_sind (only parsing).
 
 #[local] Notation "[ ]" := (nil _) (format "[ ]").
 #[local] Notation "h :: t" := (cons _ h _ t) (at level 60, right associativity).
 
-Section SCHEMES.
 
 (** An induction scheme for non-empty vectors *)
 
-#[deprecated(since="9.3", note="Use small inversions. Elaborator input: let '@cons _ a n' v' := v in ...")]
+#[deprecated(since="9.4", note="Use small inversions. Elaborator input: let '@cons _ a n' v' := v in ...")]
 Definition rectS {A} (P:forall {n}, t A (S n) -> Type)
  (bas: forall a: A, P (a :: []))
  (rect: forall a {n} (v: t A (S n)), P v -> P (a :: v)) :=
@@ -362,7 +368,7 @@ Definition rectS {A} (P:forall {n}, t A (S n) -> Type)
  end.
 
 (** A vector of length [0] is [nil] *)
-#[deprecated(since="9.3", use=inj_0)]
+#[deprecated(since="9.4", use=inj_0)]
 Definition case0 {A} (P:t A 0 -> Type) (H:P (nil A)) v:P v :=
 match v with
   |[] => H
@@ -370,7 +376,7 @@ match v with
 end.
 
 (** A vector of length [S _] is [cons] *)
-#[deprecated(since="9.3", use=inj_S)]
+#[deprecated(since="9.4", use=inj_S)]
 Definition caseS {A} (P : forall {n}, t A (S n) -> Type)
   (H : forall h {n} t, @P n (h :: t)) {n} (v: t A (S n)) : P v :=
 match v with
@@ -378,7 +384,7 @@ match v with
   |_ => fun devil => False_ind (@IDProp) devil (* subterm !!! *)
 end.
 
-#[deprecated(since="9.3", use=inj_S)]
+#[deprecated(since="9.4", use=inj_S)]
 Definition caseS' {A} {n : nat} (v : t A (S n)) : forall (P : t A (S n) -> Type)
   (H : forall h t, P (h :: t)), P v :=
   match v with
@@ -386,7 +392,7 @@ Definition caseS' {A} {n : nat} (v : t A (S n)) : forall (P : t A (S n) -> Type)
   | _ => fun devil => False_rect (@IDProp) devil
   end.
 
-#[deprecated(since="9.3", use=inj_S)]
+#[deprecated(since="9.4", use=inj_S)]
 (** An induction scheme for 2 vectors of same length *)
 Definition rect2 {A B} (P:forall {n}, t A n -> t B n -> Type)
   (bas : P [] []) (rect : forall {n v1 v2}, P v1 v2 ->
@@ -398,14 +404,16 @@ Definition rect2 {A B} (P:forall {n}, t A n -> t B n -> Type)
     caseS' v2 (fun v2' => P (h1::t1) v2') (fun h2 t2 => rect (rect2_fix t1 t2) h1 h2)
   end.
 
-End SCHEMES.
 
-Section BASES.
+(** Build a vector of n{^ th} [a] *)
+#[deprecated(since="9.4", use=repeat)]
+Abbreviation const := repeat (only parsing).
+
 (** The [p]{^ th} element of a vector of length [m].
 
 Computational behavior of this function should be the same as
 ocaml function. *)
-#[deprecated(since="9.3", use=getFin)]
+#[deprecated(since="9.4", use=getFin)]
 Definition nth {A} :=
   fix nth_fix {n : nat} (v : t A n) {struct v} : Fin.t n -> A :=
     match v with
@@ -418,12 +426,12 @@ Definition nth {A} :=
     end.
 
 (** An equivalent definition of [nth]. *)
-#[deprecated(since="9.3", use=getLt)]
+#[deprecated(since="9.4", use=getLt)]
 Definition nth_order {A} {n} (v: t A n) {p} (H: p < n) :=
 (nth v (Fin.of_nat_lt H)).
 
 (** Put [a] at the p{^ th} place of [v] *)
-#[deprecated(since="9.3", use=putFin)]
+#[deprecated(since="9.4", use=putFin)]
 Fixpoint replace {A n} (v : t A n) (p: Fin.t n) (a : A) {struct p}: t A n :=
   match p with
   | @Fin.F1 k => fun v': t A (S k) => caseS' v' _ (fun h t => a :: t)
@@ -432,22 +440,22 @@ Fixpoint replace {A n} (v : t A n) (p: Fin.t n) (a : A) {struct p}: t A n :=
   end v.
 
 (** Version of replace with [lt] *)
-#[deprecated(since="9.3", use=putLt)]
+#[deprecated(since="9.4", use=putLt)]
 Definition replace_order {A n} (v: t A n) {p} (H: p < n) :=
 replace v (Fin.of_nat_lt H).
 
 (** Remove the first element of a non empty vector *)
 (** Destruct a non empty vector *)
-#[deprecated(since="9.3", note="Use small inversions. Elaborator input: let '@cons _ a n' v' := v in ...")]
+#[deprecated(since="9.4", note="Use small inversions. Elaborator input: let '@cons _ a n' v' := v in ...")]
 Definition uncons {A} {n : nat} (v : t A (S n)) : A * t A n := (hd v, tl v).
 
 (** Remove last element of a non-empty vector *)
-#[deprecated(since="9.3", note="If you would like stdlib to keep this definition, please open an issue.")]
+#[deprecated(since="9.4", note="If you would like stdlib to keep this definition, please open an issue.")]
 Definition shiftout {A} := @rectS _ (fun n _ => t A n) (fun a => [])
   (fun h _ _ H => h :: H).
 #[global] Arguments shiftout {A} {n} v.
 
-#[deprecated(since="9.3", use=snoc)]
+#[deprecated(since="9.4", use=snoc)]
 (** Add an element at the end of a vector *)
 Fixpoint shiftin {A} {n:nat} (a : A) (v:t A n) : t A (S n) :=
 match v with
@@ -456,13 +464,13 @@ match v with
 end.
 
 (** Copy last element of a vector *)
-#[deprecated(since="9.3", note="If you would like stdlib to keep this definition, please open an issue.")]
+#[deprecated(since="9.4", note="If you would like stdlib to keep this definition, please open an issue.")]
 Definition shiftrepeat {A} := @rectS _ (fun n _ => t A (S (S n)))
   (fun h =>  h :: h :: []) (fun h _ _ H => h :: H).
 #[global] Arguments shiftrepeat {A} {n} v.
 
 (** Take first [p] elements of a vector *)
-#[deprecated(since="9.3", use=firstn)]
+#[deprecated(since="9.4", use=firstn)]
 Fixpoint take {A} {n} (p:nat) (le:p <= n) (v:t A n) : t A p :=
   match p as p return p <= n -> t A p with
   | 0 => fun _ => []
@@ -473,7 +481,7 @@ Fixpoint take {A} {n} (p:nat) (le:p <= n) (v:t A n) : t A p :=
   end le.
 
 (** Remove [p] last elements of a vector *)
-#[deprecated(since="9.3", use=firstn, note="If you would like stdlib to keep this definition, please open an issue.")]
+#[deprecated(since="9.4", use=firstn, note="If you would like stdlib to keep this definition, please open an issue.")]
 Lemma trunc : forall {A} {n} (p:nat), n > p -> t A n
   -> t A (n - p).
 Proof.
@@ -488,8 +496,12 @@ Proof.
     + exact (Nat.lt_le_incl _ _ H).
 Defined.
 
+(** Concatenation of two vectors *)
+#[deprecated(since="9.4", use=app)]
+Abbreviation append := app (only parsing).
+
 (** Split a vector into two parts *)
-#[deprecated(since="9.3", use=unapp)]
+#[deprecated(since="9.4", use=unapp)]
 Fixpoint splitat {A} (l : nat) {r : nat} :
   t A (l + r) -> t A l * t A r :=
   match l with
@@ -502,7 +514,7 @@ Fixpoint splitat {A} (l : nat) {r : nat} :
 (** Two definitions of the tail recursive function that appends two lists but
 reverses the first one *)
 
-#[deprecated(since="9.3", note="If you would like stdlib to keep this definition, please open an issue.")]
+#[deprecated(since="9.4", note="If you would like stdlib to keep this definition, please open an issue.")]
 (** This one has the exact expected computational behavior *)
 Fixpoint rev_append_tail {A n p} (v : t A n) (w: t A p)
   : t A (Nat.tail_add n p) :=
@@ -511,28 +523,18 @@ Fixpoint rev_append_tail {A n p} (v : t A n) (w: t A p)
   | a :: v' => rev_append_tail v' (a :: w)
   end.
 
-End BASES.
-
-(** Build a vector of n{^ th} [a] *)
-#[deprecated(since="9.3", use=repeat)]
-Abbreviation const := repeat (only parsing).
-
-(** Concatenation of two vectors *)
-#[deprecated(since="9.3", use=app)]
-Abbreviation append := app (only parsing).
 
 #[local] Notation "v [@ p ]" := (nth v p) (at level 1).
 
-Section ITERATORS.
 (** fold_right2 g c [x1 .. xn] [y1 .. yn] = g x1 y1 (g x2 y2 .. (g xn yn c) .. )
     c is before the vectors to be compliant with "refolding". *)
-#[deprecated(since="9.3", note="Use fold_right and map2. Please open an issue if you would like stdlib to keep this definition.")]
+#[deprecated(since="9.4", note="Use fold_right and map2. Please open an issue if you would like stdlib to keep this definition.")]
 Definition fold_right2 {A B C} (g:A -> B -> C -> C) (c: C) :=
 @rect2 _ _ (fun _ _ _ => C) c (fun _ _ _ H a b => g a b H).
 
 
 (** fold_left2 f b [x1 .. xn] [y1 .. yn] = g .. (g (g a x1 y1) x2 y2) .. xn yn *)
-#[deprecated(since="9.3", note="Use fold_left and map2. Please open an issue if you would like stdlib to keep this definition.")]
+#[deprecated(since="9.4", note="Use fold_left and map2. Please open an issue if you would like stdlib to keep this definition.")]
 Definition fold_left2 {A B C: Type} (f : A -> B -> C -> A) :=
 fix fold_left2_fix (a : A) {n} (v : t B n) : t C n -> A :=
 match v in t _ n0 return t C n0 -> A with
@@ -541,7 +543,6 @@ match v in t _ n0 return t C n0 -> A with
     caseS' w (fun _ => A) (fun wh wt => fold_left2_fix (f a vh wh) vt wt)
 end.
 
-End ITERATORS.
 
 Module VectorNotations.
 Declare Scope vector_scope.
@@ -552,7 +553,7 @@ Notation "h :: t" := (@cons _ h _ t) (at level 60, right associativity)
 Notation "[ x ]" := (@cons _ x _ (@nil _)) : vector_scope.
 Notation "[ x ; y ; .. ; z ]" := (@cons _ x _ (@cons _ y _ .. (@cons _ z _ (@nil _)) ..)) : vector_scope.
 Infix "++" := app : vector_scope.
-#[deprecated(since="9.3")]
+#[deprecated(since="9.4", note="Use getFin v p.")]
 Notation "v [@ p ]" := (nth v p) (at level 1, format "v [@ p ]") : vector_scope.
 Open Scope vector_scope.
 End VectorNotations.

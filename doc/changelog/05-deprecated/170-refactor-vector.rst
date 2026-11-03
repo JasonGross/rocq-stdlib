@@ -1,7 +1,7 @@
 - in `Vectors/VectorSpec.v` and `Vectors/VectorEq.v`
 
-  + the two files are deprecated: their content (old and new) is in
-    `Vectors/Vector.v`, and they are now deprecated aliases of it, so
+  + every lemma of the two files is deprecated: their content (old and new) is in
+    `Vectors/Vector.v`; the files stay with the deprecated copies, so
     `From Stdlib Require VectorSpec` and the qualified names still work
     (`#170 <https://github.com/coq/stdlib/pull/170>`_,
     by Andres Erbsen, with help of Jason Gross).

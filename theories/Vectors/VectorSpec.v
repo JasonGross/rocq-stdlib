@@ -10,10 +10,11 @@
 
 (** Properties of the historical Vector interface.
 
-    This file is deprecated: the new interface and its lemmas are in
-    [Vector], which includes this file. The deprecated lemmas stay here so
-    that [Require VectorSpec] and the names [VectorSpec.x] keep working. *)
-Attributes deprecated(since="9.3", note="Use Vector instead of VectorSpec.").
+    Every lemma of this file is deprecated: the new interface and its lemmas
+    are in [Vector], which requires this file. The deprecated lemmas stay here
+    so that [Require VectorSpec] and the names [VectorSpec.x] keep working. The
+    file itself carries no deprecation attribute, because [Vector] requires it
+    and a deprecated library would warn on every [Require Vector]. *)
 #[local] Set Warnings "-deprecated".
 From Stdlib Require Fin List.
 From Stdlib Require Import VectorDef PeanoNat Eqdep_dec.
@@ -246,32 +247,248 @@ Proof. split; [apply getFin_inj | intros ->; auto]. Qed.
 
 
 
+(** * Properties of the predicates and of [to_list], continued *)
+
+Lemma map2_ext [A B C] (f g : A -> B -> C) (Hfg : forall a b, f a b = g a b)
+  [n] (v : vec A n) (w : vec B n) : map2 f v w = map2 g v w.
+Proof.
+  revert w; induction v as [|a n v IH]; intros w.
+  - rewrite (inj_0 w); reflexivity.
+  - rewrite (inj_S w); cbn; f_equal; auto.
+Qed.
+
+Lemma fold_left_right_assoc_eq {A B} {f: A -> B -> A}
+  (assoc: forall a b c, f (f a b) c = f (f a c) b)
+  {n} (v: vec B n): forall a, fold_left f a v = fold_right (fun x y => f y x) v a.
+Proof.
+assert (forall n h (v: vec B n) a, fold_left f (f a h) v = f (fold_left f a v) h).
+- intros n0 h v0; induction v0 as [|? ? v0 IHv0].
+  + now simpl.
+  + intros; simpl. rewrite<- IHv0, assoc. now f_equal.
+- induction v as [|? ? v IHv].
+  + reflexivity.
+  + simpl. intros; now rewrite<- (IHv).
+Qed.
+
+Lemma app_comm_cons {A} : forall {n m : nat} (v : vec A n) (w : vec A m) (a : A),
+  a :: (v ++ w) = (a :: v) ++ w.
+Proof. reflexivity. Qed.
+
+Lemma app_inj {A} : forall {n m : nat} (v v' : vec A n) (w w' : vec A m),
+  v ++ w = v' ++ w' -> v = v' /\ w = w'.
+Proof.
+intros n m v; induction v as [|a n v IH]; intros v' w w' E.
+- rewrite (inj_0 v') in *. auto.
+- rewrite (inj_S v') in *. cbn in E.
+  specialize (IH (tl v') w w' (f_equal (@tl _ _) E)) as [-> ->].
+  split; [f_equal; exact (f_equal (@hd _ _) E)|reflexivity].
+Qed.
+
+Lemma In_cons_iff A: forall n a b (v : vec A n),
+  In a (b :: v) <-> (b = a \/ In a v).
+Proof.
+intros n a b v. split.
+- enough (H : forall n (v : vec A n), In a v ->
+    match v with
+    | nil _ => False
+    | cons _ b _ v => b = a \/ In a v
+    end) by apply H.
+  now intros ?? []; [left|right].
+- intros [<-|?].
+  + apply In_cons_hd.
+  + now apply In_cons_tl.
+Qed.
+
+Lemma Forall_impl A: forall (P Q : A -> Prop), (forall a, P a -> Q a) ->
+  forall n (v : vec A n), Forall P v -> Forall Q v.
+Proof.
+intros P Q H n v HPv. now induction HPv; constructor; [apply H|].
+Qed.
+
+Lemma Forall_forall A: forall P n (v : vec A n),
+  Forall P v <-> forall a, In a v -> P a.
+Proof.
+intros P n v. split.
+- intros H. induction H.
+  + easy.
+  + intros a [<-|?]%In_cons_iff; auto.
+- induction v as [|? ? v IHv]; intros Hin; constructor.
+  + apply Hin; constructor.
+  + apply IHv; intros a Ha.
+    apply Hin; now constructor.
+Qed.
+
+Lemma Forall_cons_iff A: forall (P : A -> Prop) a n (v : vec A n),
+  Forall P (a :: v) <-> P a /\ Forall P v.
+Proof.
+intros P a n v. split.
+- rewrite !Forall_forall. intros H. split.
+  + apply H, In_cons_hd.
+  + intros b Hb. apply H, In_cons_tl, Hb.
+- intros [??]. now constructor.
+Qed.
+
+Lemma Forall_map A B: forall (P : B -> Prop) (f : A -> B) n (v : vec A n),
+  Forall P (map f v) <-> Forall (fun x => P (f x)) v.
+Proof.
+intros P f n v. induction v as [|a n v IH].
+- split; constructor.
+- cbn. now rewrite !Forall_cons_iff, IH.
+Qed.
+
+Lemma Forall_app A: forall P n m (v : vec A n) (w : vec A m),
+  Forall P v -> Forall P w -> Forall P (v ++ w).
+Proof.
+intros ????? H ?. induction H.
+- easy.
+- now constructor.
+Qed.
+
+Lemma Forall2_cons_iff A B: forall P n h1 h2 (v1 : vec A n) (v2 : vec B n),
+  Forall2 P (h1 :: v1) (h2 :: v2) <-> P h1 h2 /\ Forall2 P v1 v2.
+Proof.
+  intros P n h1 h2 v1 v2; split.
+  2: { intros [H1 H2]; right; [exact H1 | exact H2]. }
+  intros H; inversion H as [| m x1 x2 v0 v3 ph f2p mn [x1h1 H1] [x2h2 H2]].
+  split; [exact ph |].
+  apply inj_pair2_eq_dec in H1 as ->; [| exact Nat.eq_dec].
+  apply inj_pair2_eq_dec in H2 as ->; [| exact Nat.eq_dec].
+  exact f2p.
+Qed.
+
+Lemma Forall2_app A B: forall P n m (v : vec A n) (v' : vec B n) (w : vec A m) (w' : vec B m),
+  Forall2 P v v' -> Forall2 P w w' -> Forall2 P (v ++ w) (v' ++ w').
+Proof.
+intros ??????? H ?. induction H.
+- easy.
+- now constructor.
+Qed.
+
+Lemma In_snoc A: forall a b n (v : vec A n),
+  In a (snoc v b) <-> (b = a \/ In a v).
+Proof.
+intros a b n v. induction v as [|c n v IH].
+- apply In_cons_iff.
+- cbn. rewrite !In_cons_iff. tauto.
+Qed.
+
+Lemma Forall_snoc A: forall (P : A -> Prop) a n (v : vec A n),
+  Forall P (snoc v a) <-> (P a /\ Forall P v).
+Proof.
+intros P a n v. induction v as [|b n v IH].
+- apply Forall_cons_iff.
+- cbn. rewrite !Forall_cons_iff. tauto.
+Qed.
+
+Lemma In_rev A: forall a n (v : vec A n),
+  In a (rev v) <-> In a v.
+Proof.
+intros a n v. induction v as [|b n v IH].
+- now rewrite rev_nil.
+- now rewrite rev_cons_snoc, In_snoc, In_cons_iff, IH.
+Qed.
+
+Lemma Forall_rev A: forall (P : A -> Prop) n (v : vec A n),
+  Forall P (rev v) <-> Forall P v.
+Proof.
+intros P n v. induction v as [|a n v IH].
+- now rewrite rev_nil.
+- now rewrite rev_cons_snoc, Forall_snoc, Forall_cons_iff, IH.
+Qed.
+
+Lemma of_list_to_list_opp A n (v: vec A n):
+  rew length_to_list _ _ _ in of_list (to_list v) = v.
+Proof.
+induction v as [ | h n v IHv ].
+- apply inj_0.
+- replace (length_to_list _ _ (cons _ h _ v)) with (f_equal S (length_to_list _ _ v))
+    by apply (UIP_dec Nat.eq_dec).
+  cbn; rewrite map_subst_map.
+  f_equal.
+  now etransitivity; [ | apply IHv].
+Qed.
+
+Lemma to_list_nil_iff A v:
+  to_list v = List.nil <-> v = nil A.
+Proof.
+split; intro H.
+- now rewrite (inj_0 v).
+- subst. apply to_list_nil.
+Qed.
+
+Lemma to_list_rev_append A n m (v1 : vec A n) (v2 : vec A m):
+  to_list (rev_append v1 v2) = List.rev_append (to_list v1) (to_list v2).
+Proof. cbv [rev_append]. rewrite to_list_cast, to_list_of_list; trivial. Qed.
+
+Lemma to_list_fold_left A B f (b : B) n (v : vec A n):
+  fold_left f b v = List.fold_left f (to_list v) b.
+Proof. now revert b; induction v; cbn. Qed.
+
+Lemma to_list_fold_right A B f (b : B) n (v : vec A n):
+  fold_right f v b = List.fold_right f b (to_list v).
+Proof. now revert b; induction v; cbn; intros; f_equal. Qed.
+
+Lemma to_list_Forall A P n (v : vec A n):
+  Forall P v <-> List.Forall P (to_list v).
+Proof.
+split; intros HF.
+- induction HF; now constructor.
+- remember (to_list v) as l.
+  revert n v Heql; induction HF; intros n v Heql;
+    destruct v; inversion Heql; subst; constructor; auto.
+Qed.
+
+Lemma to_list_Exists A P n (v : vec A n):
+  Exists P v <-> List.Exists P (to_list v).
+Proof.
+split; intros HF.
+- induction HF; now constructor.
+- remember (to_list v) as l.
+  revert n v Heql; induction HF; intros n v Heql;
+    destruct v; inversion Heql; subst; now constructor; auto.
+Qed.
+
+Lemma to_list_Forall2 A B P n (v1 : vec A n) (v2 : vec B n) :
+  Forall2 P v1 v2 <-> List.Forall2 P (to_list v1) (to_list v2).
+Proof.
+split; intros HF.
+- induction HF; now constructor.
+- remember (to_list v1) as l1.
+  remember (to_list v2) as l2.
+  revert n v1 v2 Heql1 Heql2; induction HF; intros n v1 v2 Heql1 Heql2.
+  + destruct v1; [ | inversion Heql1 ].
+    rewrite (inj_0 v2); constructor.
+  + destruct v1; inversion Heql1; subst.
+    rewrite (inj_S v2) in Heql2; inversion Heql2; subst.
+    rewrite (inj_S v2); constructor; auto.
+Qed.
+
 End Private.
 Import Private.
 
 (** ** The deprecated operations in terms of the new ones *)
 
-#[deprecated(since="9.3", use=getFin)]
+#[deprecated(since="9.4", use=getFin)]
 Lemma nth_getFin A n v i : @nth A n v i = @getFin A n v i.
 Proof. induction i; trivial; try rewrite (inj_S v); cbn; trivial. Qed.
 
-#[deprecated(since="9.3", use=getLt)]
+#[deprecated(since="9.4", use=getLt)]
 Lemma nth_order_getLt [A n] v p H : @nth_order A n v p H = @getLt A n v p H.
 Proof. cbv [nth_order getLt]. rewrite nth_getFin, Fin.of_nat_lt_mk; trivial. Qed.
 
-#[deprecated(since="9.3", use=putFin)]
+#[deprecated(since="9.4", use=putFin)]
 Lemma replace_putFin A n v i x : @replace A n v i x = @putFin A n v i x.
 Proof. induction i; trivial; try rewrite (inj_S v); cbn; congruence. Qed.
 
-#[deprecated(since="9.3", use=putLt)]
+#[deprecated(since="9.4", use=putLt)]
 Lemma replace_order_putLt [A n] v p H x : @replace_order A n v p H x = @putLt A n v p H x.
 Proof. cbv [replace_order putLt]. rewrite replace_putFin, Fin.of_nat_lt_mk; trivial. Qed.
 
-#[deprecated(since="9.3", use=snoc)]
+#[deprecated(since="9.4", use=snoc)]
 Lemma shiftin_snoc [A n] x v : @shiftin A n x v = @snoc A n v x.
 Proof. induction v; cbn; congruence. Qed.
 
-#[deprecated(since="9.3", use=firstn)]
+#[deprecated(since="9.4", use=firstn)]
 Lemma take_firstn_dep [A n] p le v : existT _ _ (@take A n p le v) = existT _ _ (@firstn A n v p).
 Proof.
   revert dependent p; induction v, p; cbn [Nat.min take firstn]; auto;
@@ -282,7 +499,7 @@ Proof.
   rewrite 2 to_list_cons, to_list_eq_rect; trivial.
 Qed.
 
-#[deprecated(since="9.3", use=firstn)]
+#[deprecated(since="9.4", use=firstn)]
 Lemma take_firstn [A n] p le v : @take A n p le v = cast (@firstn A n v p) (Nat.min_r _ _ le).
 Proof.
   pose proof eq_sym (take_firstn_dep p le v) as Hr; inversion_sigma.
@@ -290,11 +507,11 @@ Proof.
   apply to_list_inj; rewrite to_list_eq_rect, to_list_cast; trivial.
 Qed.
 
-#[deprecated(since="9.3", use=unapp)]
+#[deprecated(since="9.4", use=unapp)]
 Lemma splitat_unapp {A} l r v : @splitat A l r v = @unapp A l r v.
 Proof. induction l; cbn; rewrite <-?IHl; trivial. Qed.
 
-#[deprecated(since="9.3", use=rev_append)]
+#[deprecated(since="9.4", use=rev_append)]
 Lemma rev_append_tail_rev_append [A n p] v w : existT _ _ (@rev_append_tail A n p v w) = existT _ _ (@rev_append A n p v w).
 Proof.
   revert dependent p; induction v; intros.
@@ -310,20 +527,20 @@ Qed.
 
 (** * Properties of the historical interface *)
 
-#[deprecated(since="9.3", note="If you would like stdlib to keep this definition, please open an issue.")]
+#[deprecated(since="9.4", note="If you would like stdlib to keep this definition, please open an issue.")]
 Definition cons_inj {A} {a1 a2} {n} {v1 v2 : t A n}
  (eq : a1 :: v1 = a2 :: v2) : a1 = a2 /\ v1 = v2 :=
    match eq in _ = x return caseS _ (fun a2' _ v2' => fun v1' => a1 = a2' /\ v1' = v2') x v1
    with | eq_refl => conj eq_refl eq_refl
    end.
 
-#[deprecated(since="9.3", use=inj_0)]
+#[deprecated(since="9.4", use=inj_0)]
 Lemma nil_spec {A} (v : t A 0) : v = [].
 Proof.
 apply (fun P E => case0 P E v). reflexivity.
 Defined.
 
-#[deprecated(since="9.3", use=inj_S)]
+#[deprecated(since="9.4", use=inj_S)]
 Lemma eta {A} {n} (v : t A (S n)) : v = hd v :: tl v.
 Proof.
 apply (fun P IS => caseS P IS (n := n) v); intros; reflexivity.
@@ -334,7 +551,7 @@ is true for the one that use [lt] *)
 
 (** ** Properties of [nth] and [nth_order] *)
 
-#[deprecated(since="9.3", use=getFin_inj_iff)]
+#[deprecated(since="9.4", use=getFin_inj_iff)]
 Lemma eq_nth_iff A n (v1 v2: t A n):
   (forall p1 p2, p1 = p2 -> v1 [@ p1 ] = v2 [@ p2 ]) <-> v1 = v2.
 Proof.
@@ -342,12 +559,12 @@ Proof.
   split; intros; subst; eauto.
 Qed.
 
-#[deprecated(since="9.3", note="If you would like stdlib to keep this lemma, please open an issue.")]
+#[deprecated(since="9.4", note="If you would like stdlib to keep this lemma, please open an issue.")]
 Lemma nth_order_hd A: forall n (v : t A (S n)) (H : 0 < S n),
   nth_order v H = hd v.
 Proof. intros n v H; now rewrite (eta v). Qed.
 
-#[deprecated(since="9.3", note="If you would like stdlib to keep this lemma, please open an issue.")]
+#[deprecated(since="9.4", note="If you would like stdlib to keep this lemma, please open an issue.")]
 Lemma nth_order_tl A: forall n k (v : t A (S n)) (H : k < n) (HS : S k < S n),
   nth_order (tl v) H = nth_order v HS.
 Proof.
@@ -358,14 +575,14 @@ intros n; induction n; intros k v H HS.
   now rewrite (Fin.of_nat_ext H (proj2 (Nat.succ_lt_mono _ _) HS)).
 Qed.
 
-#[deprecated(since="9.3", note="If you would like stdlib to keep this lemma, please open an issue.")]
+#[deprecated(since="9.4", note="If you would like stdlib to keep this lemma, please open an issue.")]
 Lemma nth_order_last A: forall n (v: t A (S n)) (H: n < S n),
   nth_order v H = last v.
 Proof.
 unfold nth_order; refine (@rectS _ _ _ _); now simpl.
 Qed.
 
-#[deprecated(since="9.3", note="If you would like stdlib to keep this lemma, please open an issue.")]
+#[deprecated(since="9.4", note="If you would like stdlib to keep this lemma, please open an issue.")]
 Lemma nth_order_ext A: forall n k (v : t A n) (H1 H2 : k < n),
   nth_order v H1 = nth_order v H2.
 Proof.
@@ -373,7 +590,7 @@ intros n k v H1 H2; unfold nth_order.
 now rewrite (Fin.of_nat_ext H1 H2).
 Qed.
 
-#[deprecated(since="9.3", note="If you would like stdlib to keep this lemma, please open an issue.")]
+#[deprecated(since="9.4", note="If you would like stdlib to keep this lemma, please open an issue.")]
 Lemma nth_append_L A: forall n m (v : t A n) (w : t A m) p,
   (v ++ w) [@ Fin.L m p] = v [@ p].
 Proof.
@@ -382,14 +599,14 @@ intros n m v w. induction v as [|a n v IH].
 - intros p. now apply (Fin.caseS' p).
 Qed.
 
-#[deprecated(since="9.3", note="If you would like stdlib to keep this lemma, please open an issue.")]
+#[deprecated(since="9.4", note="If you would like stdlib to keep this lemma, please open an issue.")]
 Lemma nth_append_R A: forall n m (v : t A n) (w : t A m) p,
   (v ++ w) [@ Fin.R n p] = w [@ p].
 Proof.
 intros n m v w. now induction v.
 Qed.
 
-#[deprecated(since="9.3", note="If you would like stdlib to keep this lemma, please open an issue.")]
+#[deprecated(since="9.4", note="If you would like stdlib to keep this lemma, please open an issue.")]
 Lemma In_nth A: forall n (v : t A n) p,
   In (nth v p) v.
 Proof.
@@ -402,6 +619,7 @@ Qed.
 
 (** ** Properties of [replace] *)
 
+#[deprecated(since="9.4", use=getFin, note="Stated for a deprecated operation; see the lemmas about vec in Vector.")]
 Lemma nth_replace_eq A: forall n p (v : t A n) a,
   nth (replace v p a) p = a.
 Proof.
@@ -410,6 +628,7 @@ intros n p v a. induction v.
 - now apply (Fin.caseS' p).
 Qed.
 
+#[deprecated(since="9.4", use=getFin, note="Stated for a deprecated operation; see the lemmas about vec in Vector.")]
 Lemma nth_replace_neq A: forall n p q, p <> q -> forall (v : t A n) a,
   nth (replace v q a) p = nth v p.
 Proof.
@@ -420,6 +639,7 @@ induction v as [|b n v IH]; revert Hpq.
   intros ???. apply IH. contradict Hpq. now f_equal.
 Qed.
 
+#[deprecated(since="9.4", use=getLt, note="Stated for a deprecated operation; see the lemmas about vec in Vector.")]
 Lemma nth_order_replace_eq A: forall n k (v : t A n) a (H1 : k < n) (H2 : k < n),
   nth_order (replace v (Fin.of_nat_lt H2) a) H1 = a.
 Proof.
@@ -428,6 +648,7 @@ rewrite (Fin.of_nat_ext H2 H1).
 apply nth_replace_eq.
 Qed.
 
+#[deprecated(since="9.4", use=getLt, note="Stated for a deprecated operation; see the lemmas about vec in Vector.")]
 Lemma nth_order_replace_neq A: forall n k1 k2, k1 <> k2 ->
   forall (v : t A n) a (H1 : k1 < n) (H2 : k2 < n),
   nth_order (replace v (Fin.of_nat_lt H2) a) H1 = nth_order v H1.
@@ -439,6 +660,7 @@ apply (f_equal (fun p => proj1_sig (Fin.to_nat p))) in E.
 now rewrite !Fin.to_nat_of_nat in E.
 Qed.
 
+#[deprecated(since="9.4", use=putFin, note="Stated for a deprecated operation; see the lemmas about vec in Vector.")]
 Lemma replace_id A: forall n p (v : t A n),
   replace v p (nth v p) = v.
 Proof.
@@ -446,6 +668,7 @@ intros n p; induction p as [|? p IHp]; intros v; rewrite (eta v); simpl; [reflex
 now rewrite IHp.
 Qed.
 
+#[deprecated(since="9.4", use=putFin, note="Stated for a deprecated operation; see the lemmas about vec in Vector.")]
 Lemma replace_replace_eq A: forall n p (v : t A n) a b,
   replace (replace v p a) p b = replace v p b.
 Proof.
@@ -454,6 +677,7 @@ induction p as [|? p IHp]; rewrite (eta v); simpl; [reflexivity|].
 now rewrite IHp.
 Qed.
 
+#[deprecated(since="9.4", use=putFin, note="Stated for a deprecated operation; see the lemmas about vec in Vector.")]
 Lemma replace_replace_neq A: forall n p1 p2 (v : t A n) a b, p1 <> p2 ->
   replace (replace v p1 a) p2 b = replace (replace v p2 b) p1 a.
 Proof.
@@ -470,7 +694,7 @@ apply (Fin.rect2 (fun n p1 p2 => forall v a b,
     f_equal; apply IH; intros Heq; apply Hneq; now subst.
 Qed.
 
-#[deprecated(since="9.3", note="If you would like stdlib to keep this lemma, please open an issue.")]
+#[deprecated(since="9.4", note="If you would like stdlib to keep this lemma, please open an issue.")]
 Lemma replace_append_L A: forall n m (v : t A n) (w : t A m) p a,
   replace (v ++ w) (Fin.L m p) a = (replace v p a) ++ w.
 Proof.
@@ -481,7 +705,7 @@ intros n m v w p a. induction v as [|b n v IH].
   + intros p'. cbn. apply f_equal, IH.
 Qed.
 
-#[deprecated(since="9.3", note="If you would like stdlib to keep this lemma, please open an issue.")]
+#[deprecated(since="9.4", note="If you would like stdlib to keep this lemma, please open an issue.")]
 Lemma replace_append_R A: forall n m (v : t A n) (w : t A m) p a,
   replace (v ++ w) (Fin.R n p) a = v ++ (replace w p a).
 Proof.
@@ -492,6 +716,7 @@ Qed.
 
 (** ** Properties of [const] *)
 
+#[deprecated(since="9.4", use=getFin, note="Stated for a deprecated operation; see the lemmas about vec in Vector.")]
 Lemma const_nth A (a: A) n (p: Fin.t n): (const a n)[@ p] = a.
 Proof.
 now induction p.
@@ -504,6 +729,10 @@ Qed.
 
 
 
+#[deprecated(since="9.4", use=app_repeat_repeat)]
+Abbreviation append_const := Private.app_repeat_repeat (only parsing).
+
+#[deprecated(since="9.4", use=getFin, note="Stated for a deprecated operation; see the lemmas about vec in Vector.")]
 Lemma nth_map {A B} (f: A -> B) {n} v (p1 p2: Fin.t n) (eq: p1 = p2):
   (map f v) [@ p1] = f (v [@ p2]).
 Proof.
@@ -513,6 +742,10 @@ subst p2; induction p1 as [n|n p1 IHp1].
 Qed.
 
 
+#[deprecated(since="9.4", use=map_app_vec)]
+Abbreviation map_append := Private.map_app_vec (only parsing).
+
+#[deprecated(since="9.4", use=getFin, note="Stated for a deprecated operation; see the lemmas about vec in Vector.")]
 Lemma nth_map2 {A B C} (f: A -> B -> C) {n} v w (p1 p2 p3: Fin.t n):
   p1 = p2 -> p2 = p3 -> (map2 f v w) [@p1] = f (v[@p2]) (w[@p3]).
 Proof.
@@ -523,37 +756,19 @@ refine (@rect2 _ _ _ _ _); simpl.
     now simpl.
 Qed.
 
-Lemma map2_ext A B C: forall (f g:A->B->C), (forall a b, f a b = g a b) ->
-  forall n (v : t A n) (w : t B n), map2 f v w = map2 g v w.
-Proof.
-intros f g Hfg n v w.
-apply (fun P H1 H2 => rect2 P H1 H2 v w).
-- reflexivity.
-- cbn. intros ??? IH ??. now rewrite IH, Hfg.
-Qed.
 
 (** ** Properties of [fold_left] *)
 
-Lemma fold_left_right_assoc_eq {A B} {f: A -> B -> A}
-  (assoc: forall a b c, f (f a b) c = f (f a c) b)
-  {n} (v: t B n): forall a, fold_left f a v = fold_right (fun x y => f y x) v a.
-Proof.
-assert (forall n h (v: t B n) a, fold_left f (f a h) v = f (fold_left f a v) h).
-- intros n0 h v0; induction v0 as [|? ? v0 IHv0].
-  + now simpl.
-  + intros; simpl. rewrite<- IHv0, assoc. now f_equal.
-- induction v as [|? ? v IHv].
-  + reflexivity.
-  + simpl. intros; now rewrite<- (IHv).
-Qed.
 
 (** ** Properties of [take] *)
 
+#[deprecated(since="9.4", use=firstn, note="Stated for a deprecated operation; see the lemmas about vec in Vector.")]
 Lemma take_O : forall {A} {n} le (v:t A n), take 0 le v = [].
 Proof.
   reflexivity.
 Qed.
 
+#[deprecated(since="9.4", use=firstn, note="Stated for a deprecated operation; see the lemmas about vec in Vector.")]
 Lemma take_idem : forall {A} p n (v:t A n) le le',
   take p le' (take p le v) = take p le v.
 Proof.
@@ -564,6 +779,7 @@ Proof.
     + simpl. apply f_equal, IHp.
 Qed.
 
+#[deprecated(since="9.4", use=firstn, note="Stated for a deprecated operation; see the lemmas about vec in Vector.")]
 Lemma take_app : forall {A} {n} (v:t A n) {m} (w:t A m) le, take n le (append v w) = v.
 Proof.
   intros a n v; induction v as [|? ? v IHv]; intros m w le.
@@ -572,6 +788,7 @@ Proof.
 Qed.
 
 (* Proof is irrelevant for [take] *)
+#[deprecated(since="9.4", use=firstn, note="Stated for a deprecated operation; see the lemmas about vec in Vector.")]
 Lemma take_prf_irr : forall {A} p {n} (v:t A n) le le', take p le v = take p le' v.
 Proof.
   intros A p; induction p as [|p IHp]; intros n v le le'.
@@ -583,17 +800,15 @@ Qed.
 
 (** ** Properties of [uncons] and [splitat] *)
 
-#[deprecated(since="9.3", note="If you would like stdlib to keep this lemma, please open an issue.")]
+#[deprecated(since="9.4", note="If you would like stdlib to keep this lemma, please open an issue.")]
 Lemma uncons_cons {A} : forall {n : nat} (a : A) (v : t A n),
   uncons (a::v) = (a,v).
 Proof. reflexivity. Qed.
 
 (* [append] *)
 
-Lemma append_comm_cons {A} : forall {n m : nat} (v : t A n) (w : t A m) (a : A),
-  a :: (v ++ w) = (a :: v) ++ w.
-Proof. reflexivity. Qed.
 
+#[deprecated(since="9.4", use=unapp, note="Stated for a deprecated operation; see the lemmas about vec in Vector.")]
 Lemma splitat_append {A} : forall {n m : nat} (v : t A n) (w : t A m),
   splitat n (v ++ w) = (v, w).
 Proof.
@@ -602,6 +817,7 @@ Proof.
   - cbn. now rewrite IH.
 Qed.
 
+#[deprecated(since="9.4", use=unapp, note="Stated for a deprecated operation; see the lemmas about vec in Vector.")]
 Lemma append_splitat {A} : forall {n m : nat} (v : t A n) (w : t A m) (vw : t A (n+m)),
   splitat n vw = (v, w) -> vw = v ++ w.
 Proof.
@@ -615,78 +831,18 @@ clear E. induction n as [|n IH].
   rewrite (eta vw). cbn. apply f_equal, IH.
 Qed.
 
-Lemma append_inj {A} : forall {n m : nat} (v v' : t A n) (w w' : t A m),
-  v ++ w = v' ++ w' -> v = v' /\ w = w'.
-Proof.
-intros n m v v' w w' E%(f_equal (splitat _)).
-apply pair_equal_spec.
-now rewrite <- !splitat_append.
-Qed.
 
 (** ** Properties of [In] *)
 
-Lemma In_cons_iff A: forall n a b (v : t A n),
-  In a (b :: v) <-> (b = a \/ In a v).
-Proof.
-intros n a b v. split.
-- enough (H : forall n (v : t A n), In a v ->
-    match v with
-    | nil _ => False
-    | cons _ b _ v => b = a \/ In a v
-    end) by apply H.
-  now intros ?? []; [left|right].
-- intros [<-|?].
-  + apply In_cons_hd.
-  + now apply In_cons_tl.
-Qed.
 
 (** ** Properties of [Forall] and [Forall2] *)
 
-Lemma Forall_impl A: forall (P Q : A -> Prop), (forall a, P a -> Q a) ->
-  forall n (v : t A n), Forall P v -> Forall Q v.
-Proof.
-intros P Q H n v HPv. now induction HPv; constructor; [apply H|].
-Qed.
 
-Lemma Forall_forall A: forall P n (v : t A n),
-  Forall P v <-> forall a, In a v -> P a.
-Proof.
-intros P n v. split.
-- intros H. induction H.
-  + easy.
-  + intros a [<-|?]%In_cons_iff; auto.
-- induction v as [|? ? v IHv]; intros Hin; constructor.
-  + apply Hin; constructor.
-  + apply IHv; intros a Ha.
-    apply Hin; now constructor.
-Qed.
 
-Lemma Forall_cons_iff A: forall (P : A -> Prop) a n (v : t A n),
-  Forall P (a :: v) <-> P a /\ Forall P v.
-Proof.
-intros P a n v. split.
-- rewrite !Forall_forall. intros H. split.
-  + apply H, In_cons_hd.
-  + intros b Hb. apply H, In_cons_tl, Hb.
-- intros [??]. now constructor.
-Qed.
 
-Lemma Forall_map A B: forall (P : B -> Prop) (f : A -> B) n (v : t A n),
-  Forall P (map f v) <-> Forall (fun x => P (f x)) v.
-Proof.
-intros P f n v. induction v as [|a n v IH].
-- split; constructor.
-- cbn. now rewrite !Forall_cons_iff, IH.
-Qed.
 
-Lemma Forall_append A: forall P n m (v : t A n) (w : t A m),
-  Forall P v -> Forall P w -> Forall P (append v w).
-Proof.
-intros ????? H ?. induction H.
-- easy.
-- now constructor.
-Qed.
 
+#[deprecated(since="9.4", use=getFin, note="Stated for a deprecated operation; see the lemmas about vec in Vector.")]
 Lemma Forall_nth A: forall P n (v : t A n),
   Forall P v <-> forall p, P (nth v p).
 Proof.
@@ -701,6 +857,7 @@ intros P n v. split.
     * apply IH. intros p. apply (H (Fin.FS p)).
 Qed.
 
+#[deprecated(since="9.4", use=getLt, note="Stated for a deprecated operation; see the lemmas about vec in Vector.")]
 Lemma Forall_nth_order A: forall P n (v : t A n),
   Forall P v <-> forall i (Hi : i < n), P (nth_order v Hi).
 Proof.
@@ -711,18 +868,8 @@ intros P n v. rewrite Forall_nth. split.
   apply H.
 Qed.
 
-Lemma Forall2_cons_iff A B: forall P n h1 h2 (v1 : t A n) (v2 : t B n),
-  Forall2 P (h1 :: v1) (h2 :: v2) <-> P h1 h2 /\ Forall2 P v1 v2.
-Proof.
-  intros P n h1 h2 v1 v2; split.
-  2: { intros [H1 H2]; right; [exact H1 | exact H2]. }
-  intros H; inversion H as [| m x1 x2 v0 v3 ph f2p mn [x1h1 H1] [x2h2 H2]].
-  split; [exact ph |].
-  apply inj_pair2_eq_dec in H1 as ->; [| exact Nat.eq_dec].
-  apply inj_pair2_eq_dec in H2 as ->; [| exact Nat.eq_dec].
-  exact f2p.
-Qed.
 
+#[deprecated(since="9.4", use=getFin, note="Stated for a deprecated operation; see the lemmas about vec in Vector.")]
 Lemma Forall2_nth A: forall P n (v1 v2 : t A n),
   Forall2 P v1 v2 <-> forall p, P (nth v1 p) (nth v2 p).
 Proof.
@@ -737,6 +884,7 @@ intros P n v1 v2. split.
     * apply IH. intros p. apply (H (Fin.FS p)).
 Qed.
 
+#[deprecated(since="9.4", use=getLt, note="Stated for a deprecated operation; see the lemmas about vec in Vector.")]
 Lemma Forall2_nth_order A: forall P n (v1 v2 : t A n),
      Forall2 P v1 v2
  <-> forall i (Hi1 : i < n) (Hi2 : i < n), P (nth_order v1 Hi1) (nth_order v2 Hi2).
@@ -750,17 +898,10 @@ intros P n v1 v2. rewrite Forall2_nth. split.
   apply H.
 Qed.
 
-Lemma Forall2_append A B: forall P n m (v : t A n) (v' : t B n) (w : t A m) (w' : t B m),
-  Forall2 P v v' -> Forall2 P w w' -> Forall2 P (append v w) (append v' w').
-Proof.
-intros ??????? H ?. induction H.
-- easy.
-- now constructor.
-Qed.
 
 (** ** Properties of [shiftin] and [shiftrepeat] *)
 
-#[deprecated(since="9.3", note="If you would like stdlib to keep this lemma, please open an issue.")]
+#[deprecated(since="9.4", note="If you would like stdlib to keep this lemma, please open an issue.")]
 Lemma shiftin_nth A a n (v: t A n) k1 k2 (eq: k1 = k2):
   nth (shiftin a v) (Fin.L_R 1 k1) = nth v k2.
 Proof.
@@ -769,12 +910,13 @@ subst k2; induction k1 as [n|n k1 IH].
 - revert k1 IH. apply (fun P IS => caseS P IS v). now simpl.
 Qed.
 
+#[deprecated(since="9.4", use=snoc, note="Stated for a deprecated operation; see the lemmas about vec in Vector.")]
 Lemma shiftin_last A a n (v: t A n): last (shiftin a v) = a.
 Proof.
 induction v; now simpl.
 Qed.
 
-#[deprecated(since="9.3", note="If you would like stdlib to keep this lemma, please open an issue.")]
+#[deprecated(since="9.4", note="If you would like stdlib to keep this lemma, please open an issue.")]
 Lemma shiftrepeat_nth A: forall n k (v: t A (S n)),
   nth (shiftrepeat v) (Fin.L_R 1 k) = nth v k.
 Proof.
@@ -785,13 +927,13 @@ apply (fun P P0 PS => Fin.rectS P P0 PS k); clear n k.
 - intros n k IH v. rewrite (eta v). apply IH.
 Qed.
 
-#[deprecated(since="9.3", note="If you would like stdlib to keep this lemma, please open an issue.")]
+#[deprecated(since="9.4", note="If you would like stdlib to keep this lemma, please open an issue.")]
 Lemma shiftrepeat_last A: forall n (v: t A (S n)), last (shiftrepeat v) = last v.
 Proof.
 refine (@rectS _ _ _ _); now simpl.
 Qed.
 
-#[deprecated(since="9.3", use=map_snoc)]
+#[deprecated(since="9.4", use=map_snoc)]
 Lemma map_shiftin A B: forall (f : A -> B) a n (v : t A n),
   map f (shiftin a v) = shiftin (f a) (map f v).
 Proof.
@@ -800,7 +942,7 @@ intros f a n v. induction v as [|b n v IH].
 - cbn. apply f_equal, IH.
 Qed.
 
-#[deprecated(since="9.3", use=fold_right_snoc)]
+#[deprecated(since="9.4", use=fold_right_snoc)]
 Lemma fold_right_shiftin A B: forall (f : A -> B -> B) a b n (v : t A n),
   fold_right f (shiftin b v) a = fold_right f v (f b a).
 Proof.
@@ -809,6 +951,7 @@ intros f a b n v. induction v as [|c n v IH].
 - cbn. apply f_equal, IH.
 Qed.
 
+#[deprecated(since="9.4", use=In_snoc, note="Stated for a deprecated operation; see the lemmas about vec in Vector.")]
 Lemma In_shiftin A: forall a b n (v : t A n),
   In a (shiftin b v) <-> (b = a \/ In a v).
 Proof.
@@ -817,6 +960,7 @@ intros a b n v. induction v as [|c n v IH].
 - cbn. rewrite !In_cons_iff. tauto.
 Qed.
 
+#[deprecated(since="9.4", use=Forall_snoc, note="Stated for a deprecated operation; see the lemmas about vec in Vector.")]
 Lemma Forall_shiftin A: forall (P : A -> Prop) a n (v : t A n),
   Forall P (shiftin a v) <-> (P a /\ Forall P v).
 Proof.
@@ -828,11 +972,11 @@ Qed.
 (** ** Properties of [rev] *)
 
 
-#[deprecated(since="9.3", use=rev_cons_snoc)]
+#[deprecated(since="9.4", use=rev_cons_snoc)]
 Lemma rev_cons A: forall a n (v : t A n), rev (a :: v) = shiftin a (rev v).
 Proof. intros; rewrite shiftin_snoc; apply rev_cons_snoc. Qed.
 
-#[deprecated(since="9.3", use=rev_snoc)]
+#[deprecated(since="9.4", use=rev_snoc)]
 Lemma rev_shiftin A: forall a n (v : t A n),
   rev (shiftin a v) = a :: rev v.
 Proof. intros; rewrite shiftin_snoc; apply rev_snoc. Qed.
@@ -840,52 +984,36 @@ Proof. intros; rewrite shiftin_snoc; apply rev_snoc. Qed.
 
 
 
-Lemma In_rev A: forall a n (v : t A n),
-  In a (rev v) <-> In a v.
-Proof.
-intros a n v. induction v as [|b n v IH].
-- now rewrite rev_nil.
-- now rewrite rev_cons, In_shiftin, In_cons_iff, IH.
-Qed.
 
-Lemma Forall_rev A: forall (P : A -> Prop) n (v : t A n),
-  Forall P (rev v) <-> Forall P v.
-Proof.
-intros P n v. induction v as [|a n v IH].
-- now rewrite rev_nil.
-- now rewrite rev_cons, Forall_shiftin, Forall_cons_iff, IH.
-Qed.
 
 (** ** Properties of [to_list] *)
 
 
 
-Lemma of_list_to_list_opp A n (v: t A n):
-  rew length_to_list _ _ _ in of_list (to_list v) = v.
-Proof.
-induction v as [ | h n v IHv ].
-- now apply case0 with (P := fun v => v = nil A).
-- replace (length_to_list _ _ (cons _ h _ v)) with (f_equal S (length_to_list _ _ v))
-    by apply (UIP_dec Nat.eq_dec).
-  cbn; rewrite map_subst_map.
-  f_equal.
-  now etransitivity; [ | apply IHv].
-Qed.
-
-
-
-Lemma to_list_nil_iff A v:
-  to_list v = List.nil <-> v = nil A.
-Proof.
-split; intro H.
-- now apply case0 with (P := fun v => v = []).
-- subst. apply to_list_nil.
-Qed.
 
 
 
 
 
+
+
+
+#[deprecated(since="9.4", use=fold_right_rev)]
+Abbreviation fold_left_rev_right := Private.fold_right_rev (only parsing).
+
+#[deprecated(since="9.4", use=to_list_of_list)]
+Abbreviation to_list_of_list_opp := Private.to_list_of_list (only parsing).
+
+#[deprecated(since="9.4", use=hd_to_list)]
+Abbreviation to_list_hd := Private.hd_to_list (only parsing).
+
+#[deprecated(since="9.4", use=last_to_list)]
+Abbreviation to_list_last := Private.last_to_list (only parsing).
+
+#[deprecated(since="9.4", use=to_list_repeat)]
+Abbreviation to_list_const := Private.to_list_repeat (only parsing).
+
+#[deprecated(since="9.4", use=getLt, note="Stated for a deprecated operation; see the lemmas about vec in Vector.")]
 Lemma to_list_nth_order A n (v : t A n) p (H : p < n) d:
   nth_order v H = List.nth p (to_list v) d.
 Proof.
@@ -897,57 +1025,20 @@ Qed.
 
 
 
+#[deprecated(since="9.4", use=to_list_app)]
+Abbreviation to_list_append := Private.to_list_app (only parsing).
+
+#[deprecated(since="9.4", use=rev_append, note="Stated for a deprecated operation; see the lemmas about vec in Vector.")]
 Lemma to_list_rev_append_tail A n m (v1 : t A n) (v2 : t A m):
   to_list (rev_append_tail v1 v2) = List.rev_append (to_list v1) (to_list v2).
 Proof. now revert m v2; induction v1 as [ | ? ? ? IHv1 ]; intros; [ | simpl; rewrite IHv1 ]. Qed.
 
-Lemma to_list_rev_append A n m (v1 : t A n) (v2 : t A m):
-  to_list (rev_append v1 v2) = List.rev_append (to_list v1) (to_list v2).
-Proof. cbv [rev_append]. rewrite to_list_cast, to_list_of_list; trivial. Qed.
 
 
 
-Lemma to_list_fold_left A B f (b : B) n (v : t A n):
-  fold_left f b v = List.fold_left f (to_list v) b.
-Proof. now revert b; induction v; cbn. Qed.
-
-Lemma to_list_fold_right A B f (b : B) n (v : t A n):
-  fold_right f v b = List.fold_right f b (to_list v).
-Proof. now revert b; induction v; cbn; intros; f_equal. Qed.
-
-Lemma to_list_Forall A P n (v : t A n):
-  Forall P v <-> List.Forall P (to_list v).
-Proof.
-split; intros HF.
-- induction HF; now constructor.
-- remember (to_list v) as l.
-  revert n v Heql; induction HF; intros n v Heql;
-    destruct v; inversion Heql; subst; constructor; auto.
-Qed.
-
-Lemma to_list_Exists A P n (v : t A n):
-  Exists P v <-> List.Exists P (to_list v).
-Proof.
-split; intros HF.
-- induction HF; now constructor.
-- remember (to_list v) as l.
-  revert n v Heql; induction HF; intros n v Heql;
-    destruct v; inversion Heql; subst; now constructor; auto.
-Qed.
 
 
-Lemma to_list_Forall2 A B P n (v1 : t A n) (v2 : t B n) :
-  Forall2 P v1 v2 <-> List.Forall2 P (to_list v1) (to_list v2).
-Proof.
-split; intros HF.
-- induction HF; now constructor.
-- remember (to_list v1) as l1.
-  remember (to_list v2) as l2.
-  revert n v1 v2 Heql1 Heql2; induction HF; intros n v1 v2 Heql1 Heql2.
-  + destruct v1; [ | inversion Heql1 ].
-    apply case0; constructor.
-  + destruct v1; inversion Heql1; subst.
-    rewrite (eta v2) in Heql2; inversion Heql2; subst.
-    rewrite (eta v2); constructor; auto.
-Qed.
+
+
+
 

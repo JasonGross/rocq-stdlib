@@ -13,7 +13,7 @@
     This file is deprecated: no project of Rocq's CI uses its definitions
     (they only use the re-export of [Finite]). It is kept as is for one
     release. *)
-Attributes deprecated(since="9.3", note="FinFun is deprecated; Require Finite for Finite, and use fin, Fin.toNat and Fin.mk directly.").
+Attributes deprecated(since="9.4", note="FinFun is deprecated; Require Finite for Finite, and use fin, Fin.toNat and Fin.mk directly.").
 #[local] Set Warnings "-deprecated".
 Set Implicit Arguments.
 From Stdlib Require Import PeanoNat Compare_dec List Finite Fin Permutation.

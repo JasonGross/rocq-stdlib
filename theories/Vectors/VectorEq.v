@@ -8,10 +8,10 @@
 (*         *     (see LICENSE file for the text of the license)         *)
 (************************************************************************)
 
-(** This file is deprecated: the boolean equality [eqb] and [eq_dec] are in
-    [Vector]. This copy stays so that [Require VectorEq] and the names
-    [VectorEq.x] keep working. *)
-Attributes deprecated(since="9.3", note="Use Vector instead of VectorEq.").
+(** Everything in this file is deprecated: the boolean equality [eqb] and
+    [eq_dec] are in [VectorDef]. This copy stays so that [Require VectorEq]
+    and the names [VectorEq.x] keep working. The file itself carries no
+    deprecation attribute, because [Vector] requires it. *)
 #[local] Set Warnings "-deprecated".
 (** Equalities and Vector relations
 
@@ -30,6 +30,7 @@ Section BEQ.
  Variables (A: Type) (A_beq: A -> A -> bool).
  Hypothesis A_eqb_eq: forall x y, A_beq x y = true <-> x = y.
 
+ #[deprecated(since="9.4", use=VectorDef.eqb)]
  Fixpoint eqb {m n} (v1: t A m) (v2: t A n) : bool :=
    match v1, v2 with
    | [], [] => true
@@ -37,6 +38,7 @@ Section BEQ.
    | _, _ => false
    end.
 
+ #[deprecated(since="9.4", use=VectorDef.eqb_nat_eq)]
  Lemma eqb_nat_eq: forall m n (v1: t A m) (v2: t A n)
   (Hbeq: eqb v1 v2 = true), m = n.
  Proof.
@@ -47,6 +49,7 @@ Section BEQ.
    f_equal; eauto.
  Qed.
 
+ #[deprecated(since="9.4", use=VectorDef.eqb_eq)]
  Lemma eqb_eq: forall n (v1: t A n) (v2: t A n),
   eqb v1 v2 = true <-> v1 = v2.
  Proof.
@@ -58,6 +61,7 @@ Section BEQ.
      split; now auto.
  Qed.
 
+ #[deprecated(since="9.4", use=VectorDef.eq_dec)]
  Definition eq_dec n (v1 v2: t A n): {v1 = v2} + {v1 <> v2}.
  Proof.
  case_eq (eqb v1 v2); intros.
@@ -67,3 +71,6 @@ Section BEQ.
 
 End BEQ.
 
+(** [cast] used to be defined here; it is now [VectorDef.cast]. *)
+#[deprecated(since="9.4", use=VectorDef.cast)]
+Abbreviation cast := VectorDef.cast (only parsing).
